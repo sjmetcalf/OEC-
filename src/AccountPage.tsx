@@ -55,16 +55,26 @@ export default function AccountPage({
   tests,
   aptitude,
   coverage,
+  missed,
+  lower,
+  deviceNote,
   busy,
   onBack,
+  onStudyMissed,
+  onStudyChapter,
   onSignOut,
 }: {
   email: string;
   tests: PracticeTest[];
   aptitude: number;
   coverage: StudyCoverage;
+  missed: number;
+  lower: Array<{ id: string; title: string; aptitude: number }>;
+  deviceNote: string | null;
   busy: boolean;
   onBack: () => void;
+  onStudyMissed: () => void;
+  onStudyChapter: (chapterId: string) => void;
   onSignOut: () => void;
 }) {
   const percents = tests.map(scorePercent);
@@ -88,6 +98,7 @@ export default function AccountPage({
         <p className="section-label">Account</p>
         <h1>Your practice</h1>
         <p className="lede">{email}</p>
+        {deviceNote ? <p className="account-local">{deviceNote}</p> : null}
       </header>
       <div className="account-stats">
         <article className="account-card">
@@ -102,14 +113,38 @@ export default function AccountPage({
           <div className="meter account-aptitude" role="meter" aria-label={`Aptitude ${aptitude}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={aptitude}>
             <span style={{ width: `${aptitude}%` }} />
           </div>
+          {missed > 0 ? (
+            <button className="primary account-next" type="button" onClick={onStudyMissed}>
+              Study {missed} missed {missed === 1 ? "question" : "questions"}
+            </button>
+          ) : null}
+          {lower.length > 0 ? (
+            <>
+              <p className="account-caption">Lower than the rest of your practice.</p>
+              <ul className="account-weak">
+                {lower.map((chapter) => (
+                  <li key={chapter.id}>
+                    <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
+                      {chapter.title}
+                    </button>
+                    <span>{chapter.aptitude}%</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </article>
         <article className="account-card">
           <header className="account-card-head">
             <h2>Practice tests</h2>
             <p>
-              {tests.length} finished {tests.length === 1 ? "test" : "tests"}
+              {tests.length === 0 ? "No finished tests yet." : `${tests.length} finished ${tests.length === 1 ? "test" : "tests"}`}
             </p>
           </header>
+          {tests.length === 0 ? (
+            <p className="account-caption">The 80% exam line shows up after the first test.</p>
+          ) : (
+            <>
           <div className="account-stat-row">
             <div>
               <span>Recent</span>
@@ -127,6 +162,8 @@ export default function AccountPage({
           <ScoreChart tests={tests} />
           <p className="account-caption">Dashed line = 80% OEC exam line.</p>
           <p className="account-readiness">{readiness}</p>
+            </>
+          )}
         </article>
         <article className="account-card">
           <header className="account-card-head">

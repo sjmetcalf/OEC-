@@ -92,6 +92,37 @@ export function studyCoverage(results: Record<string, Attempt>, pool: Array<{ id
 
 export type StudyCoverage = ReturnType<typeof studyCoverage>;
 
+let countsSavedLocally = false;
+
+export function attemptCountsSavedLocally() {
+  return countsSavedLocally;
+}
+
+export function lowerChapters(
+  results: Record<string, Attempt>,
+  pool: Array<{ id: string; chapter: string }>,
+): Array<{ id: string; aptitude: number }> {
+  const byChapter = new Map<string, Attempt[]>();
+  for (const question of pool) {
+    const attempt = results[question.id];
+    if (!attempt || attempt.seen < 1) continue;
+    const list = byChapter.get(question.chapter) ?? [];
+    list.push(attempt);
+    byChapter.set(question.chapter, list);
+  }
+  const overall = chapterMeters([...byChapter.values()].flat(), pool.length).aptitude;
+  return [...byChapter.entries()]
+    .flatMap(([id, attempts]) => {
+      const tries = attempts.reduce((sum, attempt) => sum + attempt.seen, 0);
+      if (tries < 4) return [];
+      const aptitude = chapterMeters(attempts, attempts.length).aptitude;
+      if (aptitude >= 80 || aptitude > overall - 15) return [];
+      return [{ id, aptitude }];
+    })
+    .sort((a, b) => a.aptitude - b.aptitude)
+    .slice(0, 3);
+}
+
 export function chapterMeters(attempts: Array<Attempt | undefined>, poolSize: number): { aptitude: number; seen: number } {
   let seenQuestions = 0;
   let totalAttempts = 0;
@@ -177,7 +208,10 @@ export async function recordRemote(userId: string, id: string, correct: boolean)
   try {
     await uploadAnswers(rowsFromStats(userId, [[id, correct]]));
   } catch (error) {
-    if (missingCountColumns(error)) return;
+    if (missingCountColumns(error)) {
+      countsSavedLocally = true;
+      return;
+    }
     throw error;
   }
 }
@@ -186,7 +220,10 @@ export async function recordRemoteMany(userId: string, entries: Array<[string, b
   try {
     await uploadAnswers(rowsFromStats(userId, entries));
   } catch (error) {
-    if (missingCountColumns(error)) return;
+    if (missingCountColumns(error)) {
+      countsSavedLocally = true;
+      return;
+    }
     throw error;
   }
 }
@@ -212,7 +249,10 @@ export async function mergeRemote(userId: string): Promise<Stats> {
   if (!supabase) return loadStats();
   const { data, error } = await supabase.from("answers").select("question_id, correct, seen_count, correct_count");
   if (error) {
-    if (missingCountColumns(error)) return loadStats();
+    if (missingCountColumns(error)) {
+      countsSavedLocally = true;
+      return loadStats();
+    }
     throw error;
   }
 

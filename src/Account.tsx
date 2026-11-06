@@ -13,6 +13,7 @@ type AccountProps = {
 
 function UserButton({ label, onClick }: { label: string; onClick: () => void }) {
   const [online, setOnline] = useState(() => navigator.onLine);
+  const [seenLabel, setSeenLabel] = useState(() => localStorage.getItem("oec-connection-seen") === "1");
 
   useEffect(() => {
     function update() {
@@ -26,8 +27,23 @@ function UserButton({ label, onClick }: { label: string; onClick: () => void }) 
     };
   }, []);
 
+  const showLabel = !seenLabel || !online;
+
   return (
-    <button className="user-button" type="button" aria-label={`${label}, ${online ? "online" : "offline"}`} onClick={onClick}>
+    <span className="user-wrap">
+      {showLabel ? <span className={online ? "user-connection" : "user-connection is-offline"}>{online ? "Online" : "Offline"}</span> : null}
+      <button
+        className="user-button"
+        type="button"
+        aria-label={`${label}, ${online ? "online" : "offline"}`}
+        onClick={() => {
+          if (online) {
+            localStorage.setItem("oec-connection-seen", "1");
+            setSeenLabel(true);
+          }
+          onClick();
+        }}
+      >
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <circle cx="12" cy="8" r="3.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
         <path
@@ -40,6 +56,7 @@ function UserButton({ label, onClick }: { label: string; onClick: () => void }) 
       </svg>
       <span className={online ? "user-status is-online" : "user-status is-offline"} aria-hidden="true" />
     </button>
+    </span>
   );
 }
 

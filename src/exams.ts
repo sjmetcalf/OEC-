@@ -9,6 +9,24 @@ export type PracticeTest = {
 };
 
 const storageKey = "oec-practice-tests-v1";
+let testsSavedLocally = false;
+
+export function practiceTestsSavedLocally() {
+  return testsSavedLocally;
+}
+
+function relationMissing(error: { code?: string; message?: string }): boolean {
+  const code = error.code ?? "";
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    code === "PGRST205" ||
+    code === "42P01" ||
+    code === "PGRST204" ||
+    message.includes("schema cache") ||
+    message.includes("does not exist") ||
+    message.includes("could not find")
+  );
+}
 
 function isTest(value: unknown): value is PracticeTest {
   if (!value || typeof value !== "object") return false;
@@ -66,7 +84,12 @@ async function upload(userId: string, tests: PracticeTest[]) {
     correct: test.correct,
   }));
   const { error } = await supabase.from("practice_tests").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
-  if (error) console.warn("practice tests", error.message);
+  if (!error) return;
+  if (relationMissing(error)) {
+    testsSavedLocally = true;
+    return;
+  }
+  console.warn("practice tests", error.message);
 }
 
 async function fetchRemote(userId: string): Promise<PracticeTest[] | null> {
@@ -77,7 +100,8 @@ async function fetchRemote(userId: string): Promise<PracticeTest[] | null> {
     .eq("user_id", userId)
     .order("taken_at", { ascending: true });
   if (error) {
-    console.warn("practice tests", error.message);
+    if (relationMissing(error)) testsSavedLocally = true;
+    else console.warn("practice tests", error.message);
     return null;
   }
   return (data ?? []).flatMap((row) => {

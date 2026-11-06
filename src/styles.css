@@ -164,6 +164,23 @@ button {
   background: color-mix(in srgb, var(--accent) 18%, white);
 }
 
+.user-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.user-connection {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.user-connection.is-offline {
+  color: #a16207;
+}
+
 .user-status {
   position: absolute;
   top: 0.16rem;
@@ -497,6 +514,63 @@ h3 {
 .account-seen {
   width: 100%;
   margin-top: 0.85rem;
+}
+
+.account-local {
+  margin: 0.55rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.account-card .account-next {
+  margin-top: 0.95rem;
+  min-height: 2.75rem;
+  border-radius: var(--radius-lg);
+}
+
+.account-weak {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.account-weak li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.account-weak .text-button {
+  min-width: 0;
+  text-align: left;
+}
+
+.account-weak span {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.leave-dialog {
+  justify-items: stretch;
+  padding-top: 1.35rem;
+  text-align: center;
+}
+
+.leave-dialog h2 {
+  font-size: 1.15rem;
+}
+
+.leave-dialog p {
+  margin: 0 0 0.35rem;
+  color: var(--ink-muted);
+  font-size: 0.9375rem;
+  line-height: 1.45;
 }
 
 .account-hero {

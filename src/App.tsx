@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
 import { BackButton } from "./BackButton.tsx";
-import { loadPracticeTests, recordPracticeTest, syncPracticeTests, type PracticeTest } from "./exams.ts";
+import { loadPracticeTests, practiceTestsSavedLocally, recordPracticeTest, syncPracticeTests, type PracticeTest } from "./exams.ts";
 import {
+  attemptCountsSavedLocally,
   attemptTally,
   chapterMeters,
   loadStats,
+  lowerChapters,
   studyCoverage,
   mergeRemote,
   missedIds,
@@ -73,6 +75,14 @@ function continueDeck(items: Question[], avoidId: string): Question[] {
   return copy;
 }
 
+function deviceSaveNote(note: { tests: boolean; counts: boolean } | null) {
+  if (!note) return null;
+  if (note.tests && note.counts) return "Practice test scores and attempt totals are saved on this device.";
+  if (note.tests) return "Practice test scores are saved on this device.";
+  if (note.counts) return "Attempt totals are saved on this device.";
+  return null;
+}
+
 export default function App() {
   const [stats, setStats] = useState<Stats>(emptyStats);
   const [session, setSession] = useState<Session | null>(null);
@@ -82,11 +92,18 @@ export default function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [tests, setTests] = useState<PracticeTest[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [leaveTo, setLeaveTo] = useState<"home" | "setup" | null>(null);
+  const [deviceNote, setDeviceNote] = useState<{ tests: boolean; counts: boolean } | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const userIdRef = useRef<string | null>(null);
+  const leaveTitleId = useId();
+
+  function noteDeviceSave() {
+    setDeviceNote({ tests: practiceTestsSavedLocally(), counts: attemptCountsSavedLocally() });
+  }
 
   useEffect(() => {
     if (!supabase) {
@@ -102,16 +119,23 @@ export default function App() {
         if (!nextUser) {
           setStats(loadStats());
           setTests(loadPracticeTests(null));
+          setDeviceNote(null);
           return;
         }
         void linkVisitor();
         void syncPracticeTests(nextUser.id).then((rows) => {
-          if (userIdRef.current === nextUser.id) setTests(rows);
+          if (userIdRef.current === nextUser.id) {
+            setTests(rows);
+            noteDeviceSave();
+          }
         });
         if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED") {
           void mergeRemote(nextUser.id)
             .then((merged) => {
-              if (userIdRef.current === nextUser.id) setStats(merged);
+              if (userIdRef.current === nextUser.id) {
+                setStats(merged);
+                noteDeviceSave();
+              }
             })
             .catch((error: unknown) => {
               setSyncError(error instanceof Error ? error.message : "Could not sync progress.");
@@ -282,7 +306,10 @@ export default function App() {
         void track("exam_finish");
         const owner = userIdRef.current;
         void recordPracticeTest({ length: session.items.length, correct }, owner).then((rows) => {
-          if (userIdRef.current === owner) setTests(rows);
+          if (userIdRef.current === owner) {
+            setTests(rows);
+            noteDeviceSave();
+          }
         });
       }
       setSession({ ...session, finished: true, revealed: true });
@@ -291,6 +318,15 @@ export default function App() {
 
     setSession({ ...session, index: session.index + 1, revealed: false });
   }
+
+  useEffect(() => {
+    if (!leaveTo) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setLeaveTo(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [leaveTo]);
 
   const screen = session?.finished
     ? "results"
@@ -322,7 +358,14 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-constrain">
           <div className="topbar-lead">
-            <button type="button" className="brand" onClick={home}>
+            <button
+              type="button"
+              className="brand"
+              onClick={() => {
+                if (session?.mode === "exam" && !session.finished) setLeaveTo("home");
+                else home();
+              }}
+            >
               oec<span className="brand-tld">.fyi</span>
             </button>
           </div>
@@ -367,10 +410,26 @@ export default function App() {
               ).aptitude
             }
             coverage={studyCoverage(stats.results, questions)}
+            missed={missedIds(stats).length}
+            lower={lowerChapters(stats.results, questions).map((chapter) => ({
+              ...chapter,
+              title: chapterById(chapter.id)?.title ?? chapter.id,
+            }))}
+            deviceNote={deviceSaveNote(deviceNote)}
             busy={authBusy}
             onBack={() => {
               setAccountOpen(false);
               scrollTop();
+            }}
+            onStudyMissed={() => {
+              const missed = questions.filter((question) => missedIds(stats).includes(question.id));
+              setAccountOpen(false);
+              start("study", missed, "Missed questions");
+            }}
+            onStudyChapter={(chapterId) => {
+              const chapter = chapterById(chapterId);
+              setAccountOpen(false);
+              start("drill", questionsIn(chapterId), chapter?.title ?? "Study", undefined, chapterId);
             }}
             onSignOut={() => {
               setAccountOpen(false);
@@ -383,7 +442,15 @@ export default function App() {
             stats={stats}
             onChoose={choose}
             onNext={next}
-            onBack={session.fromChapter ? backToChapter : session.mode === "exam" ? backToExam : home}
+            onBack={
+              session.fromChapter
+                ? backToChapter
+                : session.mode === "exam" && !session.finished
+                  ? () => setLeaveTo("setup")
+                  : session.mode === "exam"
+                    ? backToExam
+                    : home
+            }
           />
         ) : reading ? (
           <ReadPool
@@ -423,6 +490,30 @@ export default function App() {
           />
         )}
       </main>
+      {leaveTo ? (
+        <div className="account-layer">
+          <button className="account-backdrop" type="button" aria-label="Stay on this test" onClick={() => setLeaveTo(null)} />
+          <div className="account-dialog leave-dialog" role="dialog" aria-labelledby={leaveTitleId}>
+            <h2 id={leaveTitleId}>Leave this test?</h2>
+            <p>It will not be saved.</p>
+            <button className="primary account-choice" type="button" onClick={() => setLeaveTo(null)}>
+              Stay
+            </button>
+            <button
+              className="ghost account-choice"
+              type="button"
+              onClick={() => {
+                const next = leaveTo;
+                setLeaveTo(null);
+                if (next === "home") home();
+                else backToExam();
+              }}
+            >
+              Leave
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
