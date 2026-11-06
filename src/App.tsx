@@ -394,7 +394,7 @@ export default function App() {
       <main
         className={session || pickingExam || accountOpen ? "is-quiz" : reading ? "is-reading" : undefined}
       >
-        {syncError ? (
+        {syncError && (session || reading || pickingExam || accountOpen) ? (
           <p className="sync-error" role="alert">
             Progress did not save. {syncError}
           </p>
@@ -487,6 +487,7 @@ export default function App() {
               const missed = questions.filter((question) => missedIds(stats).includes(question.id));
               start("study", missed, "Missed questions");
             }}
+            syncError={syncError}
           />
         )}
       </main>
@@ -581,6 +582,7 @@ function Home({
   onExam,
   onReadChapter,
   onRetry,
+  syncError,
 }: {
   stats: Stats;
   onStudy: () => void;
@@ -588,6 +590,7 @@ function Home({
   onExam: () => void;
   onReadChapter: (chapterId: string) => void;
   onRetry: () => void;
+  syncError: string | null;
 }) {
   const missed = missedIds(stats);
 
@@ -600,6 +603,11 @@ function Home({
         <span className="snow-blob snow-glow" />
       </div>
       <header className="pool-intro">
+        {syncError ? (
+          <p className="sync-error" role="alert">
+            Progress did not save. {syncError}
+          </p>
+        ) : null}
         <p className="section-label">Outdoor Emergency Care</p>
         <h1>Practice</h1>
         <p className="lede">811 questions across the OEC chapters.</p>

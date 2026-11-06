@@ -330,8 +330,7 @@ button {
   outline-offset: 2px;
 }
 
-.account-error,
-.sync-error {
+.account-error {
   color: #9f1239;
 }
 
@@ -340,8 +339,16 @@ button {
 }
 
 .sync-error {
-  margin: 0 0 1rem;
+  position: relative;
+  z-index: 1;
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, #9f1239 22%, var(--line));
+  border-radius: var(--radius);
+  background: var(--white);
+  color: #9f1239;
   font-size: 0.9375rem;
+  line-height: 1.4;
 }
 
 main {
