@@ -92,6 +92,19 @@ export default function AccountPage({
       <div className="account-stats">
         <article className="account-card">
           <header className="account-card-head">
+            <h2>Aptitude</h2>
+            <p>Correct answers out of every try.</p>
+          </header>
+          <p className="account-hero">
+            {aptitude}
+            <span>%</span>
+          </p>
+          <div className="meter account-aptitude" role="meter" aria-label={`Aptitude ${aptitude}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={aptitude}>
+            <span style={{ width: `${aptitude}%` }} />
+          </div>
+        </article>
+        <article className="account-card">
+          <header className="account-card-head">
             <h2>Practice tests</h2>
             <p>
               {tests.length} finished {tests.length === 1 ? "test" : "tests"}
@@ -150,19 +163,6 @@ export default function AccountPage({
             </div>
           </div>
           <p className="account-caption">Correct and missed follow the latest answer. A chapter counts once any question in it has been seen.</p>
-        </article>
-        <article className="account-card">
-          <header className="account-card-head">
-            <h2>Aptitude</h2>
-            <p>Correct answers out of every try.</p>
-          </header>
-          <p className="account-hero">
-            {aptitude}
-            <span>%</span>
-          </p>
-          <div className="meter account-aptitude" role="meter" aria-label={`Aptitude ${aptitude}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={aptitude}>
-            <span style={{ width: `${aptitude}%` }} />
-          </div>
         </article>
       </div>
       <button className="ghost account-sign-out" type="button" disabled={busy} onClick={onSignOut}>
