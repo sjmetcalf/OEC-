@@ -48,6 +48,10 @@ const letters = ["A", "B", "C", "D"] as const;
 type ExamLength = 25 | 50 | 100;
 const emptyStats: Stats = { results: {}, owner: null };
 
+function scrollTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+}
+
 function continueDeck(items: Question[], avoidId: string): Question[] {
   const next = shuffle(items);
   if (next.length < 2 || next[0]?.id !== avoidId) return next;
@@ -198,12 +202,14 @@ export default function App() {
     });
     if (mode === "study" || mode === "drill") void track("study_start");
     if (mode === "exam" && length) void track("exam_start", { length });
+    scrollTop();
   }
 
   function home() {
     setSession(null);
     setReading(null);
     setPickingExam(false);
+    scrollTop();
   }
 
   function backToChapter() {
@@ -233,8 +239,8 @@ export default function App() {
     if (!current || session.picks[current.id] === undefined) return;
 
     const last = session.index === session.items.length - 1;
+    scrollTop();
     if (last && session.mode === "drill") {
-      window.scrollTo(0, 0);
       setSession({
         ...session,
         items: continueDeck(session.items, current.id),
@@ -254,7 +260,6 @@ export default function App() {
       return;
     }
 
-    if (session.mode === "drill") window.scrollTo(0, 0);
     setSession({ ...session, index: session.index + 1, revealed: false });
   }
 
@@ -354,7 +359,10 @@ export default function App() {
             stats={stats}
             onStudy={() => start("study", questions, "All questions")}
             onRead={() => setReading(chapters[0]?.id ?? "1")}
-            onExam={() => setPickingExam(true)}
+            onExam={() => {
+              setPickingExam(true);
+              scrollTop();
+            }}
             onReadChapter={setReading}
             onRetry={() => {
               const missed = questions.filter((question) => missedIds(stats).includes(question.id));
@@ -462,8 +470,10 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
     0,
   );
   const cap = poolSize > 0 ? Math.min(100, poolSize) : 100;
-  const shown = Math.min(count, cap);
-  const fill = cap <= 1 ? 100 : ((shown - 1) / (cap - 1)) * 100;
+  const shown = poolSize > 0 ? Math.min(count, cap) : 0;
+  const sliderValue = shown === 0 ? 1 : shown;
+  const fill = shown === 0 ? 0 : cap <= 1 ? 100 : ((shown - 1) / (cap - 1)) * 100;
+  const questionWord = shown === 1 ? "question" : "questions";
 
   useEffect(() => {
     setCount((current) => {
@@ -499,7 +509,7 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
       <div className="exam-range">
         <p className="exam-count">
           <strong>{shown}</strong>
-          <span>questions</span>
+          <span>{questionWord}</span>
         </p>
         <input
           id="practice-length"
@@ -508,10 +518,10 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
           min={1}
           max={cap}
           step={1}
-          value={shown}
+          value={sliderValue}
           disabled={poolSize === 0}
           aria-label="Number of questions"
-          aria-valuetext={`${shown} questions`}
+          aria-valuetext={`${shown} ${questionWord}`}
           style={{ "--fill": `${fill}%` } as CSSProperties}
           onChange={(event) => {
             const next = Number(event.target.value);
@@ -812,70 +822,71 @@ function Quiz({
     : `${session.mode === "exam" ? "Practice test" : session.title === "All questions" ? session.title : "Study"} · ${chapter?.title}`;
 
   return (
-    <section className="sheet quiz">
-      {drilling ? (
-        onBack ? (
-          <div className="drill-meta">
-            <button type="button" className="quiz-back" onClick={onBack}>
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path
-                  d="M10.25 3.5 5.75 8l4.5 4.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.75"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Back
-            </button>
-          </div>
-        ) : null
-      ) : (
-        <>
-          <div className="progress">
-            <span>{label}</span>
-            <span>
-              {session.index + 1} / {session.items.length}
-            </span>
-          </div>
-          <div className="bar" aria-hidden="true">
-            <span style={{ width: `${(session.index / session.items.length) * 100}%` }} />
-          </div>
-        </>
-      )}
-      <h1>{current.prompt}</h1>
-      <div className="choices">
-        {current.choices.map((choice, index) => {
-          const selected = pick === index;
-          const correct = session.revealed && index === current.answer;
-          const incorrect = session.revealed && selected && index !== current.answer;
-          const className = ["choice", selected ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""]
-            .filter(Boolean)
-            .join(" ");
-          return (
-            <button key={choice} type="button" className={className} disabled={locked} onClick={() => onChoose(index)}>
-              <span>{letters[index]}</span>
-              {choice}
-            </button>
-          );
-        })}
-      </div>
-      {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
-      <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
-        {drilling ? (
-          <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
-        ) : (
-          <p>
-            {session.mode === "exam"
-              ? "Answers stay hidden until the end. Press 1–4, then Enter."
-              : "Press 1–4 to answer. Enter for the next question."}
-          </p>
+    <section className="quiz">
+      {drilling && onBack ? (
+        <div className="drill-meta">
+          <button type="button" className="quiz-back" onClick={onBack}>
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path
+                d="M10.25 3.5 5.75 8l4.5 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Back
+          </button>
+        </div>
+      ) : null}
+      <article className="qcard">
+        {drilling ? null : (
+          <>
+            <div className="progress">
+              <span>{label}</span>
+              <span>
+                {session.index + 1} / {session.items.length}
+              </span>
+            </div>
+            <div className="bar" aria-hidden="true">
+              <span style={{ width: `${(session.index / session.items.length) * 100}%` }} />
+            </div>
+          </>
         )}
-        <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
-          {drilling || session.index !== session.items.length - 1 ? "Next" : "See results"}
-        </button>
-      </div>
+        <h1>{current.prompt}</h1>
+        <div className="choices">
+          {current.choices.map((choice, index) => {
+            const selected = pick === index;
+            const correct = session.revealed && index === current.answer;
+            const incorrect = session.revealed && selected && index !== current.answer;
+            const className = ["choice", selected ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""]
+              .filter(Boolean)
+              .join(" ");
+            return (
+              <button key={choice} type="button" className={className} disabled={locked} onClick={() => onChoose(index)}>
+                <span>{letters[index]}</span>
+                {choice}
+              </button>
+            );
+          })}
+        </div>
+        {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
+        <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
+          {drilling ? (
+            <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
+          ) : (
+            <p>
+              {session.mode === "exam"
+                ? "Answers stay hidden until the end. Press 1–4, then Enter."
+                : "Press 1–4 to answer. Enter for the next question."}
+            </p>
+          )}
+          <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
+            {drilling || session.index !== session.items.length - 1 ? "Next" : "See results"}
+          </button>
+        </div>
+      </article>
     </section>
   );
 }

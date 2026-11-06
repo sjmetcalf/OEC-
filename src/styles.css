@@ -14,6 +14,8 @@
   --radius: 6px;
   --radius-lg: 12px;
   --max: 1080px;
+  --page-pad: 1.25rem;
+  --page-top: 1.5rem;
   --topbar-height: 3rem;
   font-family:
     "Geist Variable",
@@ -78,7 +80,7 @@ button {
   min-width: 0;
   max-width: var(--max);
   margin: 0 auto;
-  padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
+  padding: 0 max(var(--page-pad), env(safe-area-inset-right)) 0 max(var(--page-pad), env(safe-area-inset-left));
 }
 
 .topbar-lead {
@@ -251,8 +253,6 @@ button {
 }
 
 main {
-  --page-pad: 1.25rem;
-  --page-top: 1.5rem;
   max-width: var(--max);
   margin: 0 auto;
   padding: var(--page-top) max(var(--page-pad), env(safe-area-inset-right)) calc(3.75rem + env(safe-area-inset-bottom))
@@ -264,27 +264,9 @@ main.is-reading {
 }
 
 main.is-quiz {
-  max-width: none;
-  padding-top: 0;
-  padding-right: 0;
-  padding-left: 0;
-}
-
-main.is-quiz > .sync-error {
-  margin: var(--page-top) max(var(--page-pad), env(safe-area-inset-right)) 1rem
-    max(var(--page-pad), env(safe-area-inset-left));
-}
-
-main.is-quiz .quiz {
-  max-width: none;
-  margin: 0;
-  padding-right: max(1.15rem, env(safe-area-inset-right));
-  padding-left: max(1.15rem, env(safe-area-inset-left));
-  border-top: 0;
-  border-right: 0;
-  border-left: 0;
-  border-radius: 0;
-  box-shadow: none;
+  padding-top: 0.75rem;
+  padding-right: max(var(--page-pad), env(safe-area-inset-right));
+  padding-left: max(var(--page-pad), env(safe-area-inset-left));
 }
 
 .section-label {
@@ -525,8 +507,7 @@ button:focus-visible {
 }
 
 .sheet {
-  max-width: 44rem;
-  margin: 0 auto;
+  margin: 0;
   padding: 1.25rem 1.15rem 1.35rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -537,7 +518,7 @@ button:focus-visible {
 .drill-meta {
   display: flex;
   align-items: center;
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.75rem;
   min-width: 0;
 }
 
@@ -1518,7 +1499,7 @@ button:focus-visible {
 }
 
 @media (max-width: 800px) {
-  main {
+  :root {
     --page-pad: 1rem;
     --page-top: 1.15rem;
   }
@@ -1559,22 +1540,6 @@ button:focus-visible {
     gap: 0.55rem;
     min-height: 3rem;
     padding: 0.65rem 0.2rem;
-  }
-
-  .sheet {
-    margin-right: calc(var(--page-pad) * -1);
-    margin-left: calc(var(--page-pad) * -1);
-    padding: 1rem var(--page-pad) 1.15rem;
-    border-right: 0;
-    border-left: 0;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
-  main.is-quiz .quiz {
-    margin: 0;
-    padding-right: max(var(--page-pad), env(safe-area-inset-right));
-    padding-left: max(var(--page-pad), env(safe-area-inset-left));
   }
 
   .choice {
