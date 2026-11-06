@@ -45,11 +45,34 @@ type Session = {
 };
 
 const letters = ["A", "B", "C", "D"] as const;
-type ExamLength = 25 | 50 | 100;
+const examLengths = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+type ExamLength = (typeof examLengths)[number];
+
+function examLength(count: number): ExamLength | undefined {
+  return examLengths.find((length) => length === count);
+}
 const emptyStats: Stats = { results: {}, owner: null };
 
 function scrollTop() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+}
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className="quiz-back" onClick={onClick}>
+      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path
+          d="M10.25 3.5 5.75 8l4.5 4.5"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      Back
+    </button>
+  );
 }
 
 function continueDeck(items: Question[], avoidId: string): Question[] {
@@ -218,6 +241,14 @@ export default function App() {
     setSession(null);
     setReading(chapterId);
     setPickingExam(false);
+    scrollTop();
+  }
+
+  function backToExam() {
+    setSession(null);
+    setReading(null);
+    setPickingExam(true);
+    scrollTop();
   }
 
   function choose(choice: number) {
@@ -317,9 +348,7 @@ export default function App() {
         </div>
       </header>
       <main
-        className={
-          session && !session.finished ? "is-quiz" : !session && reading ? "is-reading" : undefined
-        }
+        className={session || pickingExam ? "is-quiz" : reading ? "is-reading" : undefined}
       >
         {syncError ? (
           <p className="sync-error" role="alert">
@@ -332,13 +361,14 @@ export default function App() {
             stats={stats}
             onChoose={choose}
             onNext={next}
-            onBack={session.fromChapter ? backToChapter : undefined}
+            onBack={session.fromChapter ? backToChapter : session.mode === "exam" ? backToExam : home}
           />
         ) : reading ? (
           <ReadPool
             chapterId={reading}
             stats={stats}
             hideDistractors={hideDistractors}
+            onBack={home}
             onChapter={setReading}
             onToggleDistractors={() => setHideDistractors((value) => !value)}
             onStudy={(chapterId) => {
@@ -348,10 +378,10 @@ export default function App() {
           />
         ) : pickingExam ? (
           <ExamLength
+            onBack={home}
             onExam={(count, chapterIds) => {
               const pool = chapterIds.flatMap((id) => questionsIn(id));
-              const length = count === 25 || count === 50 || count === 100 ? count : undefined;
-              start("exam", shuffle(pool).slice(0, count), `${count}-question practice test`, length);
+              start("exam", shuffle(pool).slice(0, count), `${count}-question practice test`, examLength(count));
             }}
           />
         ) : (
@@ -462,22 +492,29 @@ function Home({
   );
 }
 
-function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) => void }) {
+function ExamLength({
+  onBack,
+  onExam,
+}: {
+  onBack: () => void;
+  onExam: (count: number, chapterIds: string[]) => void;
+}) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(chapters.map((chapter) => chapter.id)));
-  const [count, setCount] = useState(25);
+  const [count, setCount] = useState(10);
   const poolSize = chapters.reduce(
     (total, chapter) => (selected.has(chapter.id) ? total + questionsIn(chapter.id).length : total),
     0,
   );
-  const cap = poolSize > 0 ? Math.min(100, poolSize) : 100;
-  const shown = poolSize > 0 ? Math.min(count, cap) : 0;
-  const sliderValue = shown === 0 ? 1 : shown;
-  const fill = shown === 0 ? 0 : cap <= 1 ? 100 : ((shown - 1) / (cap - 1)) * 100;
+  const cap = poolSize >= 10 ? Math.min(100, Math.floor(poolSize / 10) * 10) : 0;
+  const shown = cap === 0 ? 0 : Math.min(Math.max(10, count), cap);
+  const sliderValue = shown === 0 ? 10 : shown;
+  const fill = shown < 10 ? 0 : cap <= 10 ? 100 : ((shown - 10) / (cap - 10)) * 100;
   const questionWord = shown === 1 ? "question" : "questions";
 
   useEffect(() => {
     setCount((current) => {
-      const next = Math.min(Math.max(1, current), cap);
+      if (cap < 10) return current;
+      const next = Math.min(cap, Math.max(10, Math.round(current / 10) * 10));
       return next === current ? current : next;
     });
   }, [cap]);
@@ -500,7 +537,11 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
         : `${selectedCount} ${selectedCount === 1 ? "chapter" : "chapters"}`;
 
   return (
-    <section className="exam-setup">
+    <>
+      <div className="drill-meta">
+        <BackButton onClick={onBack} />
+      </div>
+      <section className="exam-setup">
       <header className="pool-intro">
         <p className="section-label">Practice test</p>
         <h1>Build a practice test</h1>
@@ -515,18 +556,18 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
           id="practice-length"
           className="exam-slider"
           type="range"
-          min={1}
-          max={cap}
-          step={1}
+          min={10}
+          max={cap < 10 ? 10 : cap}
+          step={10}
           value={sliderValue}
-          disabled={poolSize === 0}
+          disabled={cap < 10}
           aria-label="Number of questions"
           aria-valuetext={`${shown} ${questionWord}`}
           style={{ "--fill": `${fill}%` } as CSSProperties}
           onChange={(event) => {
             const next = Number(event.target.value);
             if (!Number.isFinite(next)) return;
-            setCount(Math.min(Math.max(1, next), cap));
+            setCount(Math.min(Math.max(10, next), cap));
           }}
         />
       </div>
@@ -577,7 +618,7 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
       <button
         type="button"
         className="primary exam-start"
-        disabled={selectedCount === 0 || poolSize === 0}
+        disabled={selectedCount === 0 || shown < 10}
         aria-describedby={selectedCount === 0 ? "exam-chapter-hint" : undefined}
         onClick={() => {
           const chapterIds = chapters.map((chapter) => chapter.id).filter((id) => selected.has(id));
@@ -586,7 +627,8 @@ function ExamLength({ onExam }: { onExam: (count: number, chapterIds: string[]) 
       >
         Start practice test
       </button>
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -615,6 +657,7 @@ function ReadPool({
   chapterId,
   stats,
   hideDistractors,
+  onBack,
   onChapter,
   onToggleDistractors,
   onStudy,
@@ -622,6 +665,7 @@ function ReadPool({
   chapterId: string;
   stats: Stats;
   hideDistractors: boolean;
+  onBack: () => void;
   onChapter: (chapterId: string) => void;
   onToggleDistractors: () => void;
   onStudy: (chapterId: string) => void;
@@ -688,6 +732,9 @@ function ReadPool({
             </button>
           ))}
         </div>
+      </div>
+      <div className="drill-meta">
+        <BackButton onClick={onBack} />
       </div>
       <header className="pool-intro">
         <h1>{chapter.title}</h1>
@@ -771,7 +818,13 @@ function Quiz({
   if (session.finished) {
     const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
     return (
-      <section className="sheet result">
+      <section className="quiz">
+        {onBack ? (
+          <div className="drill-meta">
+            <BackButton onClick={onBack} />
+          </div>
+        ) : null}
+        <div className="sheet result">
         <p className="section-label">{session.title}</p>
         <h1>
           {correct} <span>of {session.items.length}</span>
@@ -807,6 +860,7 @@ function Quiz({
             );
           })}
         </ol>
+        </div>
       </section>
     );
   }
@@ -823,21 +877,9 @@ function Quiz({
 
   return (
     <section className="quiz">
-      {drilling && onBack ? (
+      {onBack ? (
         <div className="drill-meta">
-          <button type="button" className="quiz-back" onClick={onBack}>
-            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-              <path
-                d="M10.25 3.5 5.75 8l4.5 4.5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            Back
-          </button>
+          <BackButton onClick={onBack} />
         </div>
       ) : null}
       <article className="qcard">
