@@ -191,46 +191,46 @@ function Home({
 
   return (
     <div className="pool">
-      <div>
+      <header className="pool-intro">
         <p className="section-label">Outdoor Emergency Care</p>
-        <h1>Practice pool</h1>
-        <p className="lede">
-          Study one question at a time, read a chapter with the answer showing, or take a practice test.
-          811 questions from the public practice set, with answers from the review bank. Not the National Ski Patrol exam.
-        </p>
-        <div className="modes">
-          <button type="button" className="mode" onClick={onStudy}>
-            <strong>Study</strong>
-            <span>One card at a time. The answer shows as soon as you pick.</span>
-          </button>
-          <button type="button" className="mode" onClick={onRead}>
-            <strong>Read questions</strong>
-            <span>Every question in a topic, with the correct answer marked.</span>
-          </button>
-          <div className="mode mode-panel">
-            <strong>Practice test</strong>
-            <span>Mixed questions from the whole pool. Answers stay hidden until the end.</span>
-            <div className="lengths" role="group" aria-label="Practice test length">
-              {examLengths.map((count) => (
-                <button key={count} type="button" onClick={() => onExam(count)}>
-                  {count} questions
-                </button>
-              ))}
-            </div>
+        <h1>Practice</h1>
+        <p className="lede">811 questions across the OEC chapters.</p>
+      </header>
+      <div className="modes">
+        <button type="button" className="mode" onClick={onStudy}>
+          <strong>Study</strong>
+          <span>One card at a time. The answer shows as soon as you pick.</span>
+        </button>
+        <button type="button" className="mode" onClick={onRead}>
+          <strong>Read a chapter</strong>
+          <span>Every question in a chapter, with the correct answer marked.</span>
+        </button>
+        <div className="mode mode-panel">
+          <strong>Practice test</strong>
+          <span>Mixed questions. Answers stay hidden until the end.</span>
+          <div className="lengths" role="group" aria-label="Practice test length">
+            {examLengths.map((count) => (
+              <button key={count} type="button" onClick={() => onExam(count)}>
+                {count}
+                <span>questions</span>
+              </button>
+            ))}
           </div>
         </div>
-        {missed.length > 0 && (
-          <button type="button" className="review-banner" onClick={onRetry}>
-            <span>
-              Study {missed.length} missed {missed.length === 1 ? "question" : "questions"}
-            </span>
-            <strong>Start</strong>
-          </button>
-        )}
       </div>
-      <section className="progress-panel" aria-label="Progress by topic">
-        <h2>Progress</h2>
-        <p>Seen answers in each topic. Open a topic to read it.</p>
+      {missed.length > 0 && (
+        <button type="button" className="review-banner" onClick={onRetry}>
+          <span>
+            Study {missed.length} missed {missed.length === 1 ? "question" : "questions"}
+          </span>
+          <strong>Start</strong>
+        </button>
+      )}
+      <section className="progress-panel" aria-label="Chapters">
+        <div className="section-head">
+          <h2>Chapters</h2>
+          <p>Answered out of the total. Open a chapter to read it.</p>
+        </div>
         <div className="chapter-list">
           {chapters.map((chapter) => {
             const pool = questionsIn(chapter.id);

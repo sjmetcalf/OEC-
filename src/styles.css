@@ -64,6 +64,7 @@ button {
   display: flex;
   align-items: center;
   min-height: var(--topbar-height);
+  padding-top: env(safe-area-inset-top);
   border-bottom: 1px solid var(--line);
   background: var(--white);
 }
@@ -75,7 +76,7 @@ button {
   width: 100%;
   max-width: var(--max);
   margin: 0 auto;
-  padding: 0 1.25rem;
+  padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
 }
 
 .brand {
@@ -114,9 +115,11 @@ button {
 }
 
 main {
+  --page-pad: 1.25rem;
   max-width: var(--max);
   margin: 0 auto;
-  padding: 1.5rem 1.25rem 3.75rem;
+  padding: 1.5rem max(var(--page-pad), env(safe-area-inset-right)) calc(3.75rem + env(safe-area-inset-bottom))
+    max(var(--page-pad), env(safe-area-inset-left));
 }
 
 .section-label {
@@ -140,10 +143,11 @@ main {
 
 h1 {
   margin: 0 0 0.65rem;
-  font-size: clamp(2.35rem, 5vw, 3.25rem);
+  font-size: clamp(2.15rem, 5vw, 3.25rem);
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 1.05;
+  text-wrap: balance;
 }
 
 h2 {
@@ -164,8 +168,9 @@ h3 {
   max-width: 38rem;
   margin: 0;
   color: var(--ink-muted);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   line-height: 1.5;
+  text-wrap: balance;
 }
 
 .actions {
@@ -209,6 +214,11 @@ button:disabled {
   opacity: 0.45;
 }
 
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -241,9 +251,11 @@ button:disabled {
 .review-banner {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
   width: 100%;
-  margin-top: 1rem;
-  padding: 0.75rem 0.9rem;
+  margin-top: 0;
+  padding: 0.85rem 0.95rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   background: var(--white);
@@ -376,8 +388,11 @@ button:disabled {
 }
 
 .quiz h1 {
-  font-size: clamp(1.45rem, 3vw, 2rem);
-  margin-bottom: 1rem;
+  margin-bottom: 1.1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.5;
 }
 
 .choices {
@@ -395,7 +410,8 @@ button:disabled {
   border-radius: var(--radius);
   background: var(--white);
   text-align: left;
-  font-size: 0.9375rem;
+  font-size: 1rem;
+  line-height: 1.45;
   cursor: pointer;
 }
 
@@ -515,28 +531,30 @@ button:disabled {
 
 .pool {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  gap: 2.5rem;
-  align-items: start;
+  gap: 1.5rem;
 }
 
-.pool h1 {
-  margin-bottom: 0.55rem;
+.pool-intro h1 {
+  margin-bottom: 0.45rem;
 }
 
 .modes {
   display: grid;
-  gap: 0.55rem;
-  margin-top: 1.25rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: stretch;
 }
 
 .mode {
-  display: grid;
-  gap: 0.15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
   width: 100%;
-  padding: 0.8rem 0.9rem;
+  min-height: 100%;
+  padding: 0.95rem 1rem 1rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   background: var(--white);
   text-align: left;
   cursor: pointer;
@@ -571,17 +589,31 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.4rem;
-  margin-top: 0.55rem;
+  width: 100%;
+  margin-top: auto;
+  padding-top: 0.85rem;
 }
 
 .lengths button {
-  padding: 0.4rem 0.35rem;
+  display: grid;
+  gap: 0.05rem;
+  justify-items: center;
+  min-height: 2.75rem;
+  padding: 0.4rem 0.2rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--white);
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 650;
+  letter-spacing: -0.03em;
   cursor: pointer;
+}
+
+.lengths button span {
+  color: var(--ink-muted);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .lengths button:hover {
@@ -589,32 +621,37 @@ button:disabled {
   background: var(--accent-soft);
 }
 
-.progress-panel h2 {
-  margin-bottom: 0.25rem;
-}
-
-.progress-panel > p {
-  margin: 0 0 0.85rem;
-  color: var(--ink-muted);
-  font-size: 0.875rem;
+.progress-panel .section-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  margin-bottom: 0.35rem;
 }
 
 .chapter-list {
-  display: grid;
-  gap: 0.35rem;
+  column-count: 2;
+  column-gap: 1.75rem;
 }
 
 .chapter-row {
   display: grid;
-  grid-template-columns: minmax(9.5rem, 12.5rem) minmax(0, 1fr) 2.6rem;
+  grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 7.5rem) 2.7rem;
   gap: 0.7rem;
   align-items: center;
   width: 100%;
-  padding: 0.45rem 0.15rem;
+  break-inside: avoid;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.35rem;
   border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.chapter-row:hover {
+  background: var(--sidebar-hover);
 }
 
 .chapter-row:hover .chapter-row-name {
@@ -622,6 +659,7 @@ button:disabled {
 }
 
 .chapter-row-name {
+  min-width: 0;
   font-size: 0.84rem;
   font-weight: 600;
   line-height: 1.25;
@@ -639,8 +677,8 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin: 0 -1.25rem 1.25rem;
-  padding: 0.45rem 1.25rem;
+  margin: 0 calc(var(--page-pad) * -1) 1.25rem;
+  padding: 0.45rem var(--page-pad);
   border-bottom: 1px solid var(--line);
   background: #faf7ff;
 }
@@ -715,10 +753,17 @@ button:disabled {
 
 .qcard h2 {
   margin: 0 0 0.75rem;
-  font-size: 1.05rem;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  line-height: 1.35;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.011em;
+  line-height: 1.5;
+}
+
+@media (min-width: 801px) {
+  .quiz h1,
+  .qcard h2 {
+    font-size: 1.25rem;
+  }
 }
 
 .qchoices {
@@ -735,7 +780,8 @@ button:disabled {
   align-items: flex-start;
   padding: 0.45rem 0.55rem;
   border-radius: var(--radius);
-  font-size: 0.92rem;
+  font-size: 1rem;
+  line-height: 1.45;
 }
 
 .qchoices li span {
@@ -759,11 +805,16 @@ button:disabled {
 }
 
 @media (max-width: 800px) {
+  main {
+    --page-pad: 1rem;
+    padding-top: 1.15rem;
+  }
+
   .hero,
   .grid,
   .section-head,
   .quiz-foot,
-  .pool,
+  .modes,
   .read-bar,
   .read-tools {
     grid-template-columns: 1fr;
@@ -771,18 +822,40 @@ button:disabled {
     align-items: stretch;
   }
 
+  .section-head {
+    align-items: start;
+    gap: 0.2rem;
+  }
+
+  .chapter-list {
+    column-count: 1;
+  }
+
   .chapter-row {
-    grid-template-columns: minmax(0, 1fr) 2.4rem;
+    grid-template-columns: minmax(0, 1fr) 4.25rem 2.5rem;
+    gap: 0.55rem;
+    min-height: 3rem;
+    padding: 0.65rem 0.2rem;
   }
 
-  .chapter-row .meter {
-    grid-column: 1 / -1;
-    order: 3;
+  .sheet {
+    margin-right: calc(var(--page-pad) * -1);
+    margin-left: calc(var(--page-pad) * -1);
+    padding: 1rem var(--page-pad) 1.15rem;
+    border-right: 0;
+    border-left: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
-  .read-bar {
-    margin-left: -1.25rem;
-    margin-right: -1.25rem;
+  .choice {
+    padding: 0.85rem 0.8rem;
+  }
+
+  .quiz-foot .primary,
+  .read-tools .primary,
+  .read-tools .ghost {
+    width: 100%;
   }
 
   .stats {
