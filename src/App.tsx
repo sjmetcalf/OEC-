@@ -113,19 +113,17 @@ export default function App() {
 
   return (
     <div className="page">
-      <header className="top">
-        <div className="brand">
-          <span className="mark" aria-hidden="true" />
-          <div>
-            <p className="eyebrow">Study tool</p>
-            <strong>OEC Practice</strong>
-          </div>
-        </div>
-        {session && (
-          <button className="text-button" type="button" onClick={() => setSession(null)}>
-            All topics
+      <header className="topbar">
+        <div className="topbar-constrain">
+          <button type="button" className="brand" onClick={() => setSession(null)}>
+            oec<span className="brand-tld">.fyi</span>
           </button>
-        )}
+          {session && (
+            <button className="text-button" type="button" onClick={() => setSession(null)}>
+              All topics
+            </button>
+          )}
+        </div>
       </header>
       <main>
         {session ? (
@@ -163,7 +161,7 @@ function Home({
     <>
       <section className="hero">
         <div>
-          <p className="eyebrow light">Outdoor Emergency Care</p>
+          <p className="section-label">Outdoor Emergency Care</p>
           <h1>Practice one decision at a time.</h1>
           <p className="lede">
             Drill a topic and see the reason immediately, or take a quiet exam and review at the end.
