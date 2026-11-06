@@ -8,7 +8,7 @@ import {
   type Question,
 } from "./questions.ts";
 
-type Mode = "drill" | "exam";
+type Mode = "study" | "exam";
 
 type Stats = {
   results: Record<string, boolean>;
@@ -24,6 +24,7 @@ type Session = {
   finished: boolean;
 };
 
+const letters = ["A", "B", "C", "D"] as const;
 const emptyStats: Stats = { results: {} };
 const storageKey = "oec-practice-v2";
 
@@ -57,6 +58,8 @@ function missedIds(stats: Stats): string[] {
 export default function App() {
   const [stats, setStats] = useState<Stats>(emptyStats);
   const [session, setSession] = useState<Session | null>(null);
+  const [reading, setReading] = useState<string | null>(null);
+  const [hideDistractors, setHideDistractors] = useState(false);
 
   useEffect(() => {
     setStats(loadStats());
@@ -64,6 +67,7 @@ export default function App() {
 
   function start(mode: Mode, source: Question[], title: string) {
     if (source.length === 0) return;
+    setReading(null);
     setSession({
       mode,
       title,
@@ -75,15 +79,20 @@ export default function App() {
     });
   }
 
+  function home() {
+    setSession(null);
+    setReading(null);
+  }
+
   function choose(choice: number) {
     if (!session || session.finished) return;
     const current = session.items[session.index];
     if (!current) return;
-    if (session.mode === "drill" && session.revealed) return;
+    if (session.mode === "study" && session.revealed) return;
 
     const firstPick = session.picks[current.id] === undefined;
     const picks = { ...session.picks, [current.id]: choice };
-    const revealed = session.mode === "drill";
+    const revealed = session.mode === "study";
     if (revealed && firstPick) {
       recordAnswer(current.id, choice === current.answer);
       setStats(loadStats());
@@ -111,16 +120,18 @@ export default function App() {
     setSession({ ...session, index: session.index + 1, revealed: false });
   }
 
+  const away = session !== null || reading !== null;
+
   return (
     <div className="page">
       <header className="topbar">
         <div className="topbar-constrain">
-          <button type="button" className="brand" onClick={() => setSession(null)}>
+          <button type="button" className="brand" onClick={home}>
             oec<span className="brand-tld">.fyi</span>
           </button>
-          {session && (
-            <button className="text-button" type="button" onClick={() => setSession(null)}>
-              All topics
+          {away && (
+            <button className="text-button" type="button" onClick={home}>
+              Pool
             </button>
           )}
         </div>
@@ -128,13 +139,27 @@ export default function App() {
       <main>
         {session ? (
           <Quiz session={session} onChoose={choose} onNext={next} />
+        ) : reading ? (
+          <ReadPool
+            chapterId={reading}
+            hideDistractors={hideDistractors}
+            onChapter={setReading}
+            onToggleDistractors={() => setHideDistractors((value) => !value)}
+            onStudy={(chapterId) => {
+              const chapter = chapterById(chapterId);
+              start("study", questionsIn(chapterId), chapter?.title ?? "Study");
+            }}
+          />
         ) : (
           <Home
             stats={stats}
-            onStart={start}
+            onStudy={() => start("study", questions, "Study")}
+            onRead={() => setReading(chapters[0]?.id ?? "1")}
+            onExam={() => start("exam", shuffle(questions).slice(0, 25), "Practice test")}
+            onReadChapter={setReading}
             onRetry={() => {
               const missed = questions.filter((question) => missedIds(stats).includes(question.id));
-              start("drill", missed, "Missed questions");
+              start("study", missed, "Missed questions");
             }}
           />
         )}
@@ -145,95 +170,151 @@ export default function App() {
 
 function Home({
   stats,
-  onStart,
+  onStudy,
+  onRead,
+  onExam,
+  onReadChapter,
   onRetry,
 }: {
   stats: Stats;
-  onStart: (mode: Mode, source: Question[], title: string) => void;
+  onStudy: () => void;
+  onRead: () => void;
+  onExam: () => void;
+  onReadChapter: (chapterId: string) => void;
   onRetry: () => void;
 }) {
-  const seen = Object.keys(stats.results).length;
-  const correctCount = Object.values(stats.results).filter(Boolean).length;
   const missed = missedIds(stats);
-  const accuracy = seen === 0 ? null : Math.round((correctCount / seen) * 100);
 
   return (
-    <>
-      <section className="hero">
-        <div>
-          <p className="section-label">Outdoor Emergency Care</p>
-          <h1>Practice one decision at a time.</h1>
-          <p className="lede">
-            Drill a topic and see the reason immediately, or take a quiet exam and review at the end.
-            Original questions, organized the way the course is taught. Not the National Ski Patrol exam.
-          </p>
-          <div className="actions">
-            <button type="button" className="primary" onClick={() => onStart("drill", shuffle(questions).slice(0, 10), "10-question drill")}>
-              10-question drill
-            </button>
-            <button type="button" className="ghost" onClick={() => onStart("exam", shuffle(questions).slice(0, 25), "25-question exam")}>
-              25-question exam
-            </button>
-          </div>
+    <div className="pool">
+      <div>
+        <p className="section-label">Outdoor Emergency Care</p>
+        <h1>Practice pool</h1>
+        <p className="lede">
+          Study one question at a time, read a chapter with the answer showing, or take a practice test.
+          811 questions from the public practice set, with answers from the review bank. Not the National Ski Patrol exam.
+        </p>
+        <div className="modes">
+          <button type="button" className="mode" onClick={onStudy}>
+            <strong>Study</strong>
+            <span>One card at a time. The answer shows as soon as you pick.</span>
+          </button>
+          <button type="button" className="mode" onClick={onRead}>
+            <strong>Read questions</strong>
+            <span>Every question in a topic, with the correct answer marked.</span>
+          </button>
+          <button type="button" className="mode" onClick={onExam}>
+            <strong>Practice test</strong>
+            <span>25 mixed questions. Answers stay hidden until the end.</span>
+          </button>
         </div>
-        <dl className="stats">
-          <div>
-            <dt>Answered</dt>
-            <dd>{seen}</dd>
-          </div>
-          <div>
-            <dt>Accuracy</dt>
-            <dd>{accuracy === null ? "—" : `${accuracy}%`}</dd>
-          </div>
-          <div>
-            <dt>To review</dt>
-            <dd>{missed.length}</dd>
-          </div>
-        </dl>
-      </section>
-
-      {missed.length > 0 && (
-        <button type="button" className="review-banner" onClick={onRetry}>
-          <span>Retry {missed.length} missed {missed.length === 1 ? "question" : "questions"}</span>
-          <strong>Start</strong>
-        </button>
-      )}
-
-      <section className="topics">
-        <div className="section-head">
-          <h2>Topics</h2>
-          <p>{questions.length} practice questions. Pick a topic or run the whole set.</p>
-        </div>
-        <div className="grid">
+        {missed.length > 0 && (
+          <button type="button" className="review-banner" onClick={onRetry}>
+            <span>
+              Study {missed.length} missed {missed.length === 1 ? "question" : "questions"}
+            </span>
+            <strong>Start</strong>
+          </button>
+        )}
+      </div>
+      <section className="progress-panel" aria-label="Progress by topic">
+        <h2>Progress</h2>
+        <p>Seen answers in each topic. Open a topic to read it.</p>
+        <div className="chapter-list">
           {chapters.map((chapter) => {
             const pool = questionsIn(chapter.id);
-            const known = pool.filter((question) => stats.results[question.id] === true);
-            const width = pool.length === 0 ? 0 : Math.round((known.length / pool.length) * 100);
+            const known = pool.filter((question) => stats.results[question.id] === true).length;
+            const seen = pool.filter((question) => stats.results[question.id] !== undefined).length;
+            const width = pool.length === 0 ? 0 : Math.round((known / pool.length) * 100);
             return (
-              <article key={chapter.id} className="topic">
-                <div>
-                  <h3>{chapter.title}</h3>
-                  <p>{chapter.summary}</p>
-                </div>
-                <div className="topic-foot">
-                  <div className="meter" aria-hidden="true">
-                    <span style={{ width: `${width}%` }} />
-                  </div>
-                  <div className="topic-meta">
-                    <span>
-                      {known.length}/{pool.length} solid
-                    </span>
-                    <button type="button" onClick={() => onStart("drill", pool, chapter.title)}>
-                      Practice
-                    </button>
-                  </div>
-                </div>
-              </article>
+              <button key={chapter.id} type="button" className="chapter-row" onClick={() => onReadChapter(chapter.id)}>
+                <span className="chapter-row-name">{chapter.title}</span>
+                <span className="meter" aria-hidden="true">
+                  <span style={{ width: `${width}%` }} />
+                </span>
+                <span className="chapter-row-count">
+                  {seen}/{pool.length}
+                </span>
+              </button>
             );
           })}
         </div>
       </section>
-    </>
+    </div>
+  );
+}
+
+function ReadPool({
+  chapterId,
+  hideDistractors,
+  onChapter,
+  onToggleDistractors,
+  onStudy,
+}: {
+  chapterId: string;
+  hideDistractors: boolean;
+  onChapter: (chapterId: string) => void;
+  onToggleDistractors: () => void;
+  onStudy: (chapterId: string) => void;
+}) {
+  const chapter = chapterById(chapterId) ?? chapters[0];
+  const pool = questionsIn(chapter.id);
+
+  return (
+    <section className="read">
+      <div className="read-bar">
+        <div className="read-tabs" role="tablist" aria-label="Topics">
+          {chapters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={item.id === chapter.id}
+              className={item.id === chapter.id ? "is-active" : ""}
+              onClick={() => onChapter(item.id)}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+        <div className="read-tools">
+          <button type="button" className="ghost" onClick={onToggleDistractors}>
+            {hideDistractors ? "Show choices" : "Hide distractors"}
+          </button>
+          <button type="button" className="primary" onClick={() => onStudy(chapter.id)}>
+            Study this topic
+          </button>
+        </div>
+      </div>
+      <header className="read-head">
+        <p className="section-label">{pool.length} questions</p>
+        <h1>{chapter.title}</h1>
+        <p className="lede">{chapter.summary}</p>
+      </header>
+      <div className="qlist">
+        {pool.map((question, index) => (
+          <article key={question.id} className="qcard">
+            <p className="qid">
+              {index + 1} / {pool.length}
+            </p>
+            <h2>{question.prompt}</h2>
+            <ol className="qchoices">
+              {question.choices.map((choice, choiceIndex) => {
+                const correct = choiceIndex === question.answer;
+                if (hideDistractors && !correct) return null;
+                return (
+                  <li key={choice} className={correct ? "correct" : ""}>
+                    <span>{letters[choiceIndex]}</span>
+                    {choice}
+                  </li>
+                );
+              })}
+            </ol>
+            {question.explanation ? <p className="explain">{question.explanation}</p> : null}
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -261,14 +342,14 @@ function Quiz({
     const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
     return (
       <section className="sheet result">
-        <p className="eyebrow">{session.title}</p>
+        <p className="section-label">{session.title}</p>
         <h1>
           {correct} <span>of {session.items.length}</span>
         </h1>
         <p className="lede">
           {correct === session.items.length
             ? "Every one. Run another topic while it is fresh."
-            : "The misses are below, with the answer and the reason."}
+            : "The misses are below, with the correct answer."}
         </p>
         <ol className="review">
           {session.items.map((item, index) => {
@@ -286,8 +367,10 @@ function Quiz({
                 <p>{item.prompt}</p>
                 {!right && (
                   <>
-                    <p className="answer-line">Answer: {item.choices[item.answer]}</p>
-                    <p className="why">{item.explanation}</p>
+                    <p className="answer-line">
+                      Answer: {letters[item.answer]}. {item.choices[item.answer]}
+                    </p>
+                    {item.explanation ? <p className="why">{item.explanation}</p> : null}
                   </>
                 )}
               </li>
@@ -302,13 +385,13 @@ function Quiz({
   if (!current) return null;
   const pick = session.picks[current.id];
   const chapter = chapterById(current.chapter);
-  const locked = session.mode === "drill" && session.revealed;
+  const locked = session.mode === "study" && session.revealed;
 
   return (
     <section className="sheet quiz">
       <div className="progress">
         <span>
-          {session.mode === "exam" ? "Exam" : "Drill"} · {chapter?.title}
+          {session.mode === "exam" ? "Practice test" : "Study"} · {chapter?.title}
         </span>
         <span>
           {session.index + 1} / {session.items.length}
@@ -328,15 +411,19 @@ function Quiz({
             .join(" ");
           return (
             <button key={choice} type="button" className={className} disabled={locked} onClick={() => onChoose(index)}>
-              <span>{index + 1}</span>
+              <span>{letters[index]}</span>
               {choice}
             </button>
           );
         })}
       </div>
-      {session.revealed && <p className="explain">{current.explanation}</p>}
+      {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
       <div className="quiz-foot">
-        <p>{session.mode === "exam" ? "Answers stay hidden until the end. Press 1–4, then Enter." : "Press 1–4 to answer. Enter for the next question."}</p>
+        <p>
+          {session.mode === "exam"
+            ? "Answers stay hidden until the end. Press 1–4, then Enter."
+            : "Press 1–4 to answer. Enter for the next question."}
+        </p>
         <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
           {session.index === session.items.length - 1 ? "See results" : "Next"}
         </button>

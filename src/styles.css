@@ -513,14 +513,246 @@ button:disabled {
   color: var(--accent-warm);
 }
 
+.pool {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 2.5rem;
+  align-items: start;
+}
+
+.pool h1 {
+  margin-bottom: 0.55rem;
+}
+
+.modes {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.25rem;
+}
+
+.mode {
+  display: grid;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.mode strong {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.mode span {
+  color: var(--ink-muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.mode:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.progress-panel h2 {
+  margin-bottom: 0.25rem;
+}
+
+.progress-panel > p {
+  margin: 0 0 0.85rem;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+
+.chapter-list {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.chapter-row {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 12.5rem) minmax(0, 1fr) 2.6rem;
+  gap: 0.7rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.45rem 0.15rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chapter-row:hover .chapter-row-name {
+  color: var(--accent);
+}
+
+.chapter-row-name {
+  font-size: 0.84rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.chapter-row-count {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.read-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 -1.25rem 1.25rem;
+  padding: 0.45rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: #faf7ff;
+}
+
+.read-tabs {
+  display: flex;
+  gap: 0.15rem;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.read-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.read-tabs button {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  padding: 0.55rem 0.7rem 0.45rem;
+  color: var(--ink-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.read-tabs button.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.read-tools {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+}
+
+.read-head {
+  max-width: 44rem;
+  margin-bottom: 1rem;
+}
+
+.read-head h1 {
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+}
+
+.qlist {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 44rem;
+}
+
+.qcard {
+  padding: 1rem 1.05rem 1.05rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+.qid {
+  margin: 0 0 0.35rem;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.qcard h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.qchoices {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qchoices li {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+}
+
+.qchoices li span {
+  flex: 0 0 auto;
+  width: 1.35rem;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.qchoices li.correct {
+  background: #f3fff6;
+}
+
+.qchoices li.correct span {
+  color: #16a34a;
+}
+
+.qcard .explain {
+  margin-top: 0.75rem;
+}
+
 @media (max-width: 800px) {
   .hero,
   .grid,
   .section-head,
-  .quiz-foot {
+  .quiz-foot,
+  .pool,
+  .read-bar,
+  .read-tools {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .chapter-row {
+    grid-template-columns: minmax(0, 1fr) 2.4rem;
+  }
+
+  .chapter-row .meter {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .read-bar {
+    margin-left: -1.25rem;
+    margin-right: -1.25rem;
   }
 
   .stats {
