@@ -68,6 +68,30 @@ export function attemptTally(attempt: Attempt | undefined): string {
   return `Right ${attempt.correct} of ${attempt.seen}`;
 }
 
+export function studyCoverage(results: Record<string, Attempt>, pool: Array<{ id: string; chapter: string }>) {
+  let seen = 0;
+  let correct = 0;
+  let missed = 0;
+  const chapters = new Map<string, { size: number; seen: number }>();
+  for (const question of pool) {
+    const chapter = chapters.get(question.chapter) ?? { size: 0, seen: 0 };
+    chapter.size += 1;
+    const attempt = results[question.id];
+    if (attempt && attempt.seen > 0) {
+      seen += 1;
+      chapter.seen += 1;
+      if (attempt.last) correct += 1;
+      else missed += 1;
+    }
+    chapters.set(question.chapter, chapter);
+  }
+  let chaptersStarted = 0;
+  for (const chapter of chapters.values()) if (chapter.seen > 0) chaptersStarted += 1;
+  return { total: pool.length, seen, correct, missed, chaptersStarted, chapterCount: chapters.size };
+}
+
+export type StudyCoverage = ReturnType<typeof studyCoverage>;
+
 export function chapterMeters(attempts: Array<Attempt | undefined>, poolSize: number): { aptitude: number; seen: number } {
   let seenQuestions = 0;
   let totalAttempts = 0;

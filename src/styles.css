@@ -135,31 +135,51 @@ button {
   min-width: 0;
 }
 
-.account-signed-in {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  min-width: 0;
-}
-
-.topbar-actions > .text-button,
-.account-signed-in > .text-button {
+.topbar-actions > .text-button {
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-.account-email {
-  flex: 0 1 auto;
-  max-width: 11rem;
-  min-width: 0;
-  overflow: hidden;
-  color: var(--ink-muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.user-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.user-button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.user-button:hover {
+  background: color-mix(in srgb, var(--accent) 18%, white);
+}
+
+.user-status {
+  position: absolute;
+  top: 0.16rem;
+  right: 0.16rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border: 1.5px solid var(--white);
+  border-radius: 999px;
+}
+
+.user-status.is-online {
+  background: #16a34a;
+}
+
+.user-status.is-offline {
+  background: #eab308;
 }
 
 .account-layer {
@@ -182,28 +202,93 @@ button {
 .account-dialog {
   position: relative;
   display: grid;
-  gap: 0.85rem;
-  width: min(24rem, 100%);
+  gap: 1.15rem;
+  width: min(22.5rem, 100%);
   margin: 0;
-  padding: 1.25rem;
+  padding: 2.75rem 1.25rem 1.35rem;
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: 1.25rem;
   background: var(--white);
   box-shadow: var(--shadow-md);
 }
 
-.account-dialog h2 {
-  font-size: 1.35rem;
+.account-close {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--sidebar-hover);
+  color: var(--ink-muted);
+  cursor: pointer;
 }
 
-.account-dialog p {
+.account-close svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+.account-close:hover {
+  color: var(--ink);
+}
+
+.account-intro,
+.account-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.account-intro {
+  justify-items: center;
+  text-align: center;
+}
+
+.account-mark {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  margin-bottom: 0.15rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.account-mark svg {
+  width: 1.55rem;
+  height: 1.55rem;
+}
+
+.account-intro h2,
+.account-form h2 {
+  font-size: 1.15rem;
+}
+
+.account-intro p,
+.account-form p {
   margin: 0;
   color: var(--ink-muted);
   font-size: 0.9375rem;
   line-height: 1.45;
 }
 
-.account-dialog label {
+.account-intro p {
+  max-width: 16rem;
+  margin-bottom: 0.35rem;
+}
+
+.account-dialog .account-choice {
+  width: 100%;
+  min-height: 2.75rem;
+  border-radius: var(--radius-lg);
+}
+
+.account-form label {
   display: grid;
   gap: 0.35rem;
   color: var(--ink);
@@ -211,9 +296,9 @@ button {
   font-weight: 600;
 }
 
-.account-dialog input {
+.account-form input {
   width: 100%;
-  padding: 0.65rem 0.75rem;
+  padding: 0.7rem 0.8rem;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--white);
@@ -223,7 +308,7 @@ button {
   font-weight: 450;
 }
 
-.account-dialog input:focus-visible {
+.account-form input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -235,16 +320,6 @@ button {
 
 .account-notice {
   color: var(--ink);
-}
-
-.account-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-}
-
-.account-switch {
-  justify-self: start;
 }
 
 .sync-error {
@@ -318,6 +393,178 @@ h3 {
   font-size: 1.05rem;
   line-height: 1.5;
   text-wrap: balance;
+}
+
+.offline-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.7rem;
+  max-width: 38rem;
+  margin: 0.75rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.offline-install {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.offline-install:hover {
+  color: var(--accent-hover);
+}
+
+.account-page {
+  display: grid;
+  gap: 1.15rem;
+  min-width: 0;
+}
+
+.account-stats {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.account-card {
+  min-width: 0;
+  padding: 1rem 1.05rem 1.15rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--white);
+  box-shadow: var(--shadow-sm);
+}
+
+.account-card-head h2 {
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.account-card-head p,
+.account-caption,
+.account-readiness {
+  margin: 0.25rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.account-stat-row {
+  display: flex;
+  gap: 1.75rem;
+  margin: 0.85rem 0 0.15rem;
+}
+
+.account-stat-row span {
+  display: block;
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.account-stat-row strong {
+  font-size: 1.35rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.account-coverage {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem 1.25rem;
+  margin-top: 0.95rem;
+}
+
+.account-coverage strong {
+  white-space: nowrap;
+}
+
+.account-coverage strong span {
+  display: inline;
+  margin-left: 0.05rem;
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.account-seen {
+  width: 100%;
+  margin-top: 0.85rem;
+}
+
+.account-hero {
+  margin: 0.55rem 0 0.5rem;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.account-hero span {
+  margin-left: 0.1rem;
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+.account-aptitude {
+  max-width: 16rem;
+}
+
+.account-page .account-sign-out {
+  justify-self: start;
+  min-width: 8.5rem;
+  min-height: 2.75rem;
+  margin-top: 0.15rem;
+  border-radius: var(--radius-lg);
+}
+
+.score-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 0.35rem;
+}
+
+.score-chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.score-chart-ref {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.score-chart-line {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.score-chart-point {
+  fill: var(--white);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.score-chart-point.is-under {
+  stroke: var(--accent-warm);
+}
+
+.score-chart-label {
+  fill: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .actions {
@@ -1362,6 +1609,10 @@ button:focus-visible {
   cursor: pointer;
 }
 
+.read-tabs button:first-child {
+  padding-left: 0;
+}
+
 .read-tabs button.is-active {
   color: var(--accent);
   border-bottom-color: var(--accent);
@@ -1578,8 +1829,8 @@ button:focus-visible {
 
   .read-meters {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.85rem 1.1rem;
+    grid-template-columns: 1fr;
+    gap: 0.7rem;
     width: 100%;
   }
 
@@ -1596,5 +1847,89 @@ button:focus-visible {
   .read-meter-bar {
     width: 100%;
     height: 0.28rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .brand,
+  .user-button,
+  .quiz-back,
+  .text-button,
+  .offline-install,
+  .primary,
+  .ghost,
+  .mode,
+  .review-banner,
+  .chapter-row,
+  .choice,
+  .exam-tool,
+  .exam-chapter,
+  .account-close,
+  .read-tabs button {
+    transition:
+      transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+      background 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.18s ease,
+      color 0.15s ease;
+  }
+
+  .mode:hover,
+  .review-banner:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .brand:active,
+  .user-button:active,
+  .quiz-back:active,
+  .account-close:active,
+  .read-tabs button:active,
+  .mode:active,
+  .review-banner:active,
+  .chapter-row:active,
+  .exam-chapter:active,
+  .exam-tool:active,
+  .primary:active:not(:disabled),
+  .ghost:active:not(:disabled),
+  .choice:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+
+  .quiz .qcard {
+    animation: card-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .account-dialog {
+    animation: dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .meter span,
+  .bar span {
+    transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
   }
 }

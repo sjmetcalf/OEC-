@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Account from "./Account.tsx";
+import AccountPage from "./AccountPage.tsx";
+import { BackButton } from "./BackButton.tsx";
+import { loadPracticeTests, recordPracticeTest, syncPracticeTests, type PracticeTest } from "./exams.ts";
 import {
   attemptTally,
   chapterMeters,
   loadStats,
+  studyCoverage,
   mergeRemote,
   missedIds,
   recordLocal,
@@ -57,24 +61,6 @@ function scrollTop() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 }
 
-function BackButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button type="button" className="quiz-back" onClick={onClick}>
-      <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-        <path
-          d="M10.25 3.5 5.75 8l4.5 4.5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.75"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      Back
-    </button>
-  );
-}
-
 function continueDeck(items: Question[], avoidId: string): Question[] {
   const next = shuffle(items);
   if (next.length < 2 || next[0]?.id !== avoidId) return next;
@@ -94,6 +80,8 @@ export default function App() {
   const [pickingExam, setPickingExam] = useState(false);
   const [hideDistractors, setHideDistractors] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [tests, setTests] = useState<PracticeTest[]>([]);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -113,9 +101,13 @@ export default function App() {
         setUserEmail(nextUser?.email ?? null);
         if (!nextUser) {
           setStats(loadStats());
+          setTests(loadPracticeTests(null));
           return;
         }
         void linkVisitor();
+        void syncPracticeTests(nextUser.id).then((rows) => {
+          if (userIdRef.current === nextUser.id) setTests(rows);
+        });
         if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED") {
           void mergeRemote(nextUser.id)
             .then((merged) => {
@@ -232,6 +224,7 @@ export default function App() {
     setSession(null);
     setReading(null);
     setPickingExam(false);
+    setAccountOpen(false);
     scrollTop();
   }
 
@@ -284,8 +277,13 @@ export default function App() {
     }
     if (last) {
       if (session.mode === "exam") {
+        const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
         rememberMany(session.items.map((item) => [item.id, session.picks[item.id] === item.answer]));
         void track("exam_finish");
+        const owner = userIdRef.current;
+        void recordPracticeTest({ length: session.items.length, correct }, owner).then((rows) => {
+          if (userIdRef.current === owner) setTests(rows);
+        });
       }
       setSession({ ...session, finished: true, revealed: true });
       return;
@@ -337,7 +335,10 @@ export default function App() {
                 error={authError}
                 onSignIn={signIn}
                 onSignUp={signUp}
-                onSignOut={signOut}
+                onOpen={() => {
+                  setAccountOpen(true);
+                  scrollTop();
+                }}
                 onClearFeedback={() => {
                   setAuthError(null);
                   setAuthNotice(null);
@@ -348,14 +349,35 @@ export default function App() {
         </div>
       </header>
       <main
-        className={session || pickingExam ? "is-quiz" : reading ? "is-reading" : undefined}
+        className={session || pickingExam || accountOpen ? "is-quiz" : reading ? "is-reading" : undefined}
       >
         {syncError ? (
           <p className="sync-error" role="alert">
             Progress did not save. {syncError}
           </p>
         ) : null}
-        {session ? (
+        {accountOpen && userEmail ? (
+          <AccountPage
+            email={userEmail}
+            tests={tests}
+            aptitude={
+              chapterMeters(
+                questions.map((question) => stats.results[question.id]),
+                questions.length,
+              ).aptitude
+            }
+            coverage={studyCoverage(stats.results, questions)}
+            busy={authBusy}
+            onBack={() => {
+              setAccountOpen(false);
+              scrollTop();
+            }}
+            onSignOut={() => {
+              setAccountOpen(false);
+              void signOut();
+            }}
+          />
+        ) : session ? (
           <Quiz
             session={session}
             stats={stats}
@@ -405,6 +427,62 @@ export default function App() {
   );
 }
 
+type InstallPrompt = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+function OfflineInstall() {
+  const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [hidden, setHidden] = useState(true);
+  const [ios, setIos] = useState(false);
+
+  useEffect(() => {
+    const installed =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+    if (!import.meta.env.PROD || installed || !("serviceWorker" in navigator)) return;
+    setHidden(false);
+    setIos(/iphone|ipad|ipod/i.test(navigator.userAgent));
+
+    let cancel = false;
+    function onPrompt(event: Event) {
+      event.preventDefault();
+      setPrompt(event as InstallPrompt);
+    }
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    void navigator.serviceWorker.ready.then(() => {
+      if (!cancel) setSaved(true);
+    });
+    return () => {
+      cancel = true;
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+    };
+  }, []);
+
+  if (hidden) return null;
+
+  async function install() {
+    if (!prompt) return;
+    await prompt.prompt();
+    setPrompt(null);
+  }
+
+  return (
+    <p className="offline-note">
+      <span>{saved ? "Questions are saved on this device." : "Saving the questions on this device."}</span>
+      {prompt ? (
+        <button type="button" className="offline-install" onClick={() => void install()}>
+          Install
+        </button>
+      ) : ios ? (
+        <span>Add to Home Screen to open it like an app.</span>
+      ) : null}
+    </p>
+  );
+}
+
 function Home({
   stats,
   onStudy,
@@ -434,6 +512,7 @@ function Home({
         <p className="section-label">Outdoor Emergency Care</p>
         <h1>Practice</h1>
         <p className="lede">811 questions across the OEC chapters.</p>
+        <OfflineInstall />
       </header>
       <div className="modes">
         <button type="button" className="mode" onClick={onStudy}>
@@ -882,7 +961,7 @@ function Quiz({
           <BackButton onClick={onBack} />
         </div>
       ) : null}
-      <article className="qcard">
+      <article key={current.id} className="qcard">
         {drilling ? null : (
           <>
             <div className="progress">
