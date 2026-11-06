@@ -559,6 +559,36 @@ button:disabled {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
 }
 
+.mode-panel {
+  cursor: default;
+}
+
+.mode-panel:hover {
+  border-color: var(--line);
+}
+
+.lengths {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.lengths button {
+  padding: 0.4rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.lengths button:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
 .progress-panel h2 {
   margin-bottom: 0.25rem;
 }

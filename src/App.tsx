@@ -25,6 +25,8 @@ type Session = {
 };
 
 const letters = ["A", "B", "C", "D"] as const;
+const examLengths = [25, 50, 100] as const;
+type ExamLength = (typeof examLengths)[number];
 const emptyStats: Stats = { results: {} };
 const storageKey = "oec-practice-v2";
 
@@ -155,7 +157,9 @@ export default function App() {
             stats={stats}
             onStudy={() => start("study", questions, "Study")}
             onRead={() => setReading(chapters[0]?.id ?? "1")}
-            onExam={() => start("exam", shuffle(questions).slice(0, 25), "Practice test")}
+            onExam={(count) =>
+              start("exam", shuffle(questions).slice(0, count), `${count}-question practice test`)
+            }
             onReadChapter={setReading}
             onRetry={() => {
               const missed = questions.filter((question) => missedIds(stats).includes(question.id));
@@ -179,7 +183,7 @@ function Home({
   stats: Stats;
   onStudy: () => void;
   onRead: () => void;
-  onExam: () => void;
+  onExam: (count: ExamLength) => void;
   onReadChapter: (chapterId: string) => void;
   onRetry: () => void;
 }) {
@@ -203,10 +207,17 @@ function Home({
             <strong>Read questions</strong>
             <span>Every question in a topic, with the correct answer marked.</span>
           </button>
-          <button type="button" className="mode" onClick={onExam}>
+          <div className="mode mode-panel">
             <strong>Practice test</strong>
-            <span>25 mixed questions. Answers stay hidden until the end.</span>
-          </button>
+            <span>Mixed questions from the whole pool. Answers stay hidden until the end.</span>
+            <div className="lengths" role="group" aria-label="Practice test length">
+              {examLengths.map((count) => (
+                <button key={count} type="button" onClick={() => onExam(count)}>
+                  {count} questions
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         {missed.length > 0 && (
           <button type="button" className="review-banner" onClick={onRetry}>
