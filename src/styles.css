@@ -529,31 +529,31 @@ h3 {
   border-radius: var(--radius-lg);
 }
 
+.account-aptitude {
+  width: 100%;
+  max-width: none;
+  margin-top: 0.15rem;
+}
+
 .account-weak {
-  display: grid;
-  gap: 0.2rem;
-  margin: 0.45rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0 0;
   padding: 0;
   list-style: none;
 }
 
-.account-weak li {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .account-weak .text-button {
-  min-width: 0;
-  text-align: left;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  padding: 0;
 }
 
 .account-weak span {
   color: var(--ink-muted);
-  font-size: 0.875rem;
   font-variant-numeric: tabular-nums;
-  font-weight: 650;
 }
 
 .leave-dialog {
@@ -585,10 +585,6 @@ h3 {
   margin-left: 0.1rem;
   font-size: 1.15rem;
   font-weight: 650;
-}
-
-.account-aptitude {
-  max-width: 16rem;
 }
 
 .account-page .account-sign-out {

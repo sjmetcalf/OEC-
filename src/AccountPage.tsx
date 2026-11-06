@@ -119,19 +119,16 @@ export default function AccountPage({
             </button>
           ) : null}
           {lower.length > 0 ? (
-            <>
-              <p className="account-caption">Lower than the rest of your practice.</p>
-              <ul className="account-weak">
-                {lower.map((chapter) => (
-                  <li key={chapter.id}>
-                    <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
-                      {chapter.title}
-                    </button>
+            <ul className="account-weak">
+              {lower.map((chapter) => (
+                <li key={chapter.id}>
+                  <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
+                    {chapter.title}
                     <span>{chapter.aptitude}%</span>
-                  </li>
-                ))}
-              </ul>
-            </>
+                  </button>
+                </li>
+              ))}
+            </ul>
           ) : null}
         </article>
         <article className="account-card">
@@ -141,9 +138,7 @@ export default function AccountPage({
               {tests.length === 0 ? "No finished tests yet." : `${tests.length} finished ${tests.length === 1 ? "test" : "tests"}`}
             </p>
           </header>
-          {tests.length === 0 ? (
-            <p className="account-caption">The 80% exam line shows up after the first test.</p>
-          ) : (
+          {tests.length > 0 ? (
             <>
           <div className="account-stat-row">
             <div>
@@ -163,7 +158,7 @@ export default function AccountPage({
           <p className="account-caption">Dashed line = 80% OEC exam line.</p>
           <p className="account-readiness">{readiness}</p>
             </>
-          )}
+          ) : null}
         </article>
         <article className="account-card">
           <header className="account-card-head">
