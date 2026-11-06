@@ -1,6 +1,6 @@
 # OEC Practice
 
-Unofficial Outdoor Emergency Care study tool. Drill by topic, take a short exam, and review the questions you missed. It is not the National Ski Patrol exam and it does not certify anyone.
+Unofficial Outdoor Emergency Care study tool. Drill by topic, take a short exam, and review the questions you missed. The questions are original practice items, not the National Ski Patrol test bank, and the app does not certify anyone.
 
 The site is a React app on Cloudflare Workers, served at [oec.fyi](https://oec.fyi).
 

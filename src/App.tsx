@@ -1,24 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  chapterById,
+  chapters,
   questions,
-  questionsForTopic,
+  questionsIn,
   shuffle,
-  topics,
   type Question,
-  type Topic,
 } from "./questions.ts";
 
 type Mode = "drill" | "exam";
-type TopicFilter = Topic | "All";
 
 type Stats = {
-  seen: number;
-  correct: number;
-  missed: string[];
+  results: Record<string, boolean>;
 };
 
 type Session = {
   mode: Mode;
+  title: string;
   items: Question[];
   index: number;
   picks: Record<string, number>;
@@ -26,15 +24,15 @@ type Session = {
   finished: boolean;
 };
 
-const emptyStats: Stats = { seen: 0, correct: 0, missed: [] };
-const storageKey = "oec-practice-stats";
+const emptyStats: Stats = { results: {} };
+const storageKey = "oec-practice-v2";
 
 function loadStats(): Stats {
   try {
     const raw = localStorage.getItem(storageKey);
     if (!raw) return emptyStats;
     const parsed = JSON.parse(raw) as Stats;
-    if (!Array.isArray(parsed.missed)) return emptyStats;
+    if (!parsed.results || typeof parsed.results !== "object") return emptyStats;
     return parsed;
   } catch {
     return emptyStats;
@@ -47,32 +45,29 @@ function saveStats(stats: Stats) {
 
 function recordAnswer(id: string, correct: boolean) {
   const stats = loadStats();
-  const missed = stats.missed.filter((item) => item !== id);
-  if (!correct) missed.push(id);
-  saveStats({
-    seen: stats.seen + 1,
-    correct: stats.correct + (correct ? 1 : 0),
-    missed,
-  });
+  saveStats({ results: { ...stats.results, [id]: correct } });
+}
+
+function missedIds(stats: Stats): string[] {
+  return Object.entries(stats.results)
+    .filter(([, correct]) => !correct)
+    .map(([id]) => id);
 }
 
 export default function App() {
   const [stats, setStats] = useState<Stats>(emptyStats);
-  const [topic, setTopic] = useState<TopicFilter>("All");
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     setStats(loadStats());
   }, []);
 
-  const pool = useMemo(() => questionsForTopic(topic), [topic]);
-
-  function start(mode: Mode, source: Question[] = pool, count = source.length) {
-    const items = shuffle(source).slice(0, Math.min(count, source.length));
-    if (items.length === 0) return;
+  function start(mode: Mode, source: Question[], title: string) {
+    if (source.length === 0) return;
     setSession({
       mode,
-      items,
+      title,
+      items: shuffle(source),
       index: 0,
       picks: {},
       revealed: false,
@@ -83,12 +78,13 @@ export default function App() {
   function choose(choice: number) {
     if (!session || session.finished) return;
     const current = session.items[session.index];
+    if (!current) return;
     if (session.mode === "drill" && session.revealed) return;
-    if (session.mode === "exam" && session.picks[current.id] !== undefined) return;
 
+    const firstPick = session.picks[current.id] === undefined;
     const picks = { ...session.picks, [current.id]: choice };
     const revealed = session.mode === "drill";
-    if (revealed && session.picks[current.id] === undefined) {
+    if (revealed && firstPick) {
       recordAnswer(current.id, choice === current.answer);
       setStats(loadStats());
     }
@@ -98,33 +94,21 @@ export default function App() {
   function next() {
     if (!session) return;
     const current = session.items[session.index];
-    const pick = session.picks[current.id];
-    if (pick === undefined) return;
+    if (!current || session.picks[current.id] === undefined) return;
 
-    if (session.mode === "exam" && session.index === session.items.length - 1) {
-      for (const item of session.items) {
-        recordAnswer(item.id, session.picks[item.id] === item.answer);
+    const last = session.index === session.items.length - 1;
+    if (last) {
+      if (session.mode === "exam") {
+        for (const item of session.items) {
+          recordAnswer(item.id, session.picks[item.id] === item.answer);
+        }
+        setStats(loadStats());
       }
-      setStats(loadStats());
       setSession({ ...session, finished: true, revealed: true });
       return;
     }
 
-    if (session.index === session.items.length - 1) {
-      setSession({ ...session, finished: true });
-      return;
-    }
-
-    setSession({
-      ...session,
-      index: session.index + 1,
-      revealed: false,
-    });
-  }
-
-  function retryMissed() {
-    const missed = questions.filter((question) => stats.missed.includes(question.id));
-    start("drill", missed);
+    setSession({ ...session, index: session.index + 1, revealed: false });
   }
 
   return (
@@ -133,28 +117,27 @@ export default function App() {
         <div className="brand">
           <span className="mark" aria-hidden="true" />
           <div>
-            <p className="eyebrow">Unofficial study tool</p>
+            <p className="eyebrow">Study tool</p>
             <strong>OEC Practice</strong>
           </div>
         </div>
         {session && (
           <button className="text-button" type="button" onClick={() => setSession(null)}>
-            Back to start
+            All topics
           </button>
         )}
       </header>
-
       <main>
         {session ? (
           <Quiz session={session} onChoose={choose} onNext={next} />
         ) : (
           <Home
-            topic={topic}
-            poolCount={pool.length}
             stats={stats}
-            onTopic={setTopic}
             onStart={start}
-            onRetryMissed={retryMissed}
+            onRetry={() => {
+              const missed = questions.filter((question) => missedIds(stats).includes(question.id));
+              start("drill", missed, "Missed questions");
+            }}
           />
         )}
       </main>
@@ -163,99 +146,96 @@ export default function App() {
 }
 
 function Home({
-  topic,
-  poolCount,
   stats,
-  onTopic,
   onStart,
-  onRetryMissed,
+  onRetry,
 }: {
-  topic: TopicFilter;
-  poolCount: number;
   stats: Stats;
-  onTopic: (topic: TopicFilter) => void;
-  onStart: (mode: Mode, source?: Question[], count?: number) => void;
-  onRetryMissed: () => void;
+  onStart: (mode: Mode, source: Question[], title: string) => void;
+  onRetry: () => void;
 }) {
-  const accuracy = stats.seen === 0 ? 0 : Math.round((stats.correct / stats.seen) * 100);
+  const seen = Object.keys(stats.results).length;
+  const correctCount = Object.values(stats.results).filter(Boolean).length;
+  const missed = missedIds(stats);
+  const accuracy = seen === 0 ? null : Math.round((correctCount / seen) * 100);
 
   return (
-    <div className="home">
-      <section className="intro">
-        <p className="eyebrow">Outdoor Emergency Care</p>
-        <h1>Practice the decisions you will make on the hill.</h1>
-        <p className="lede">
-          Twenty-four original questions across scene size-up, assessment, trauma,
-          medical problems, and the environment. This is study material, not the
-          National Ski Patrol exam and not a certification.
-        </p>
-        <div className="actions">
-          <button type="button" className="primary" onClick={() => onStart("drill", undefined, 10)}>
-            10-question drill
-          </button>
-          <button type="button" className="secondary" onClick={() => onStart("exam", undefined, 20)}>
-            20-question exam
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            disabled={poolCount === 0}
-            onClick={() => onStart("drill")}
-          >
-            Drill this topic ({poolCount})
-          </button>
-        </div>
-      </section>
-
-      <section className="panel">
-        <h2>Topic</h2>
-        <div className="topics">
-          <TopicButton current={topic} value="All" onTopic={onTopic} />
-          {topics.map((item) => (
-            <TopicButton key={item} current={topic} value={item} onTopic={onTopic} />
-          ))}
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow light">Outdoor Emergency Care</p>
+          <h1>Practice one decision at a time.</h1>
+          <p className="lede">
+            Drill a topic and see the reason immediately, or take a quiet exam and review at the end.
+            Original questions, organized the way the course is taught. Not the National Ski Patrol exam.
+          </p>
+          <div className="actions">
+            <button type="button" className="primary" onClick={() => onStart("drill", shuffle(questions).slice(0, 10), "10-question drill")}>
+              10-question drill
+            </button>
+            <button type="button" className="ghost" onClick={() => onStart("exam", shuffle(questions).slice(0, 25), "25-question exam")}>
+              25-question exam
+            </button>
+          </div>
         </div>
         <dl className="stats">
           <div>
             <dt>Answered</dt>
-            <dd>{stats.seen}</dd>
+            <dd>{seen}</dd>
           </div>
           <div>
             <dt>Accuracy</dt>
-            <dd>{stats.seen === 0 ? "—" : `${accuracy}%`}</dd>
+            <dd>{accuracy === null ? "—" : `${accuracy}%`}</dd>
           </div>
           <div>
             <dt>To review</dt>
-            <dd>{stats.missed.length}</dd>
+            <dd>{missed.length}</dd>
           </div>
         </dl>
-        {stats.missed.length > 0 && (
-          <button type="button" className="secondary wide" onClick={onRetryMissed}>
-            Retry missed questions
-          </button>
-        )}
       </section>
-    </div>
-  );
-}
 
-function TopicButton({
-  current,
-  value,
-  onTopic,
-}: {
-  current: TopicFilter;
-  value: TopicFilter;
-  onTopic: (topic: TopicFilter) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={current === value ? "chip on" : "chip"}
-      onClick={() => onTopic(value)}
-    >
-      {value}
-    </button>
+      {missed.length > 0 && (
+        <button type="button" className="review-banner" onClick={onRetry}>
+          <span>Retry {missed.length} missed {missed.length === 1 ? "question" : "questions"}</span>
+          <strong>Start</strong>
+        </button>
+      )}
+
+      <section className="topics">
+        <div className="section-head">
+          <h2>Topics</h2>
+          <p>{questions.length} practice questions. Pick a topic or run the whole set.</p>
+        </div>
+        <div className="grid">
+          {chapters.map((chapter) => {
+            const pool = questionsIn(chapter.id);
+            const known = pool.filter((question) => stats.results[question.id] === true);
+            const width = pool.length === 0 ? 0 : Math.round((known.length / pool.length) * 100);
+            return (
+              <article key={chapter.id} className="topic">
+                <div>
+                  <h3>{chapter.title}</h3>
+                  <p>{chapter.summary}</p>
+                </div>
+                <div className="topic-foot">
+                  <div className="meter" aria-hidden="true">
+                    <span style={{ width: `${width}%` }} />
+                  </div>
+                  <div className="topic-meta">
+                    <span>
+                      {known.length}/{pool.length} solid
+                    </span>
+                    <button type="button" onClick={() => onStart("drill", pool, chapter.title)}>
+                      Practice
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -268,30 +248,50 @@ function Quiz({
   onChoose: (choice: number) => void;
   onNext: () => void;
 }) {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (session.finished) return;
+      const number = Number(event.key);
+      if (number >= 1 && number <= 4) onChoose(number - 1);
+      if (event.key === "Enter") onNext();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onChoose, onNext, session.finished]);
+
   if (session.finished) {
     const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
     return (
-      <section className="quiz">
-        <p className="eyebrow">{session.mode === "exam" ? "Exam" : "Drill"} complete</p>
+      <section className="sheet result">
+        <p className="eyebrow">{session.title}</p>
         <h1>
-          {correct} of {session.items.length}
+          {correct} <span>of {session.items.length}</span>
         </h1>
         <p className="lede">
           {correct === session.items.length
-            ? "Clean run. Try another set, or switch topics."
-            : "Review the ones you missed, then run them again."}
+            ? "Every one. Run another topic while it is fresh."
+            : "The misses are below, with the answer and the reason."}
         </p>
         <ol className="review">
           {session.items.map((item, index) => {
             const pick = session.picks[item.id];
             const right = pick === item.answer;
+            const chapter = chapterById(item.chapter);
             return (
               <li key={item.id} className={right ? "right" : "wrong"}>
-                <span>
-                  {index + 1}. {item.prompt}
-                </span>
-                <strong>{right ? "Correct" : item.choices[item.answer]}</strong>
-                {!right && <p>{item.explanation}</p>}
+                <div className="review-top">
+                  <span>
+                    {index + 1}. {chapter?.title}
+                  </span>
+                  <strong>{right ? "Correct" : "Review"}</strong>
+                </div>
+                <p>{item.prompt}</p>
+                {!right && (
+                  <>
+                    <p className="answer-line">Answer: {item.choices[item.answer]}</p>
+                    <p className="why">{item.explanation}</p>
+                  </>
+                )}
               </li>
             );
           })}
@@ -301,24 +301,26 @@ function Quiz({
   }
 
   const current = session.items[session.index];
+  if (!current) return null;
   const pick = session.picks[current.id];
-  const locked = session.mode === "drill" ? session.revealed : pick !== undefined;
+  const chapter = chapterById(current.chapter);
+  const locked = session.mode === "drill" && session.revealed;
 
   return (
-    <section className="quiz">
+    <section className="sheet quiz">
       <div className="progress">
         <span>
-          {session.mode === "exam" ? "Exam" : "Drill"} · {current.topic}
+          {session.mode === "exam" ? "Exam" : "Drill"} · {chapter?.title}
         </span>
         <span>
           {session.index + 1} / {session.items.length}
         </span>
       </div>
       <div className="bar" aria-hidden="true">
-        <span style={{ width: `${((session.index + (pick === undefined ? 0 : 1)) / session.items.length) * 100}%` }} />
+        <span style={{ width: `${(session.index / session.items.length) * 100}%` }} />
       </div>
       <h1>{current.prompt}</h1>
-      <div className="choices" role="listbox" aria-label="Answers">
+      <div className="choices">
         {current.choices.map((choice, index) => {
           const selected = pick === index;
           const correct = session.revealed && index === current.answer;
@@ -327,23 +329,18 @@ function Quiz({
             .filter(Boolean)
             .join(" ");
           return (
-            <button
-              key={choice}
-              type="button"
-              className={className}
-              disabled={locked && session.mode === "drill"}
-              onClick={() => onChoose(index)}
-            >
-              <span>{String.fromCharCode(65 + index)}</span>
+            <button key={choice} type="button" className={className} disabled={locked} onClick={() => onChoose(index)}>
+              <span>{index + 1}</span>
               {choice}
             </button>
           );
         })}
       </div>
       {session.revealed && <p className="explain">{current.explanation}</p>}
-      <div className="actions">
+      <div className="quiz-foot">
+        <p>{session.mode === "exam" ? "Answers stay hidden until the end. Press 1–4, then Enter." : "Press 1–4 to answer. Enter for the next question."}</p>
         <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
-          {session.index === session.items.length - 1 ? "Finish" : "Next"}
+          {session.index === session.items.length - 1 ? "See results" : "Next"}
         </button>
       </div>
     </section>
