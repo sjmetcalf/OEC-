@@ -347,17 +347,31 @@ export default function App() {
     scrollTop();
   }
 
-  function advance(current: Session) {
-    const question = current.items[current.index];
-    if (!question || current.picks[question.id] === undefined) return;
+  function choose(choice: number) {
+    if (!session || session.finished) return;
+    const current = session.items[session.index];
+    if (!current) return;
+    const drilling = session.mode === "study" || session.mode === "drill";
+    if (drilling && session.revealed) return;
 
-    const last = current.index === current.items.length - 1;
+    const firstPick = session.picks[current.id] === undefined;
+    const picks = { ...session.picks, [current.id]: choice };
+    if (drilling && firstPick) remember(current.id, choice === current.answer);
+    setSession({ ...session, picks, revealed: drilling });
+  }
+
+  function next() {
+    if (!session) return;
+    const current = session.items[session.index];
+    if (!current || session.picks[current.id] === undefined) return;
+
+    const last = session.index === session.items.length - 1;
     scrollTop();
-    if (last && current.mode === "drill") {
+    if (last && session.mode === "drill") {
       if (shuffleAnswers) setShuffleSeed(Math.floor(Math.random() * 0x7fffffff));
       setSession({
-        ...current,
-        items: continueDeck(current.items, question.id),
+        ...session,
+        items: continueDeck(session.items, current.id),
         index: 0,
         picks: {},
         orders: {},
@@ -367,12 +381,12 @@ export default function App() {
       return;
     }
     if (last) {
-      if (current.mode === "exam") {
-        const correct = current.items.filter((item) => current.picks[item.id] === item.answer).length;
-        rememberMany(current.items.map((item) => [item.id, current.picks[item.id] === item.answer]));
+      if (session.mode === "exam") {
+        const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
+        rememberMany(session.items.map((item) => [item.id, session.picks[item.id] === item.answer]));
         void track("exam_finish");
         const owner = userIdRef.current;
-        void recordPracticeTest({ length: current.items.length, correct }, owner)
+        void recordPracticeTest({ length: session.items.length, correct }, owner)
           .then((rows) => {
             if (userIdRef.current === owner) {
               setTests(rows);
@@ -384,44 +398,11 @@ export default function App() {
             setSyncError(syncFailureMessage(error));
           });
       }
-      setSession({ ...current, finished: true, revealed: true });
+      setSession({ ...session, finished: true, revealed: true });
       return;
     }
 
-    setSession({ ...current, index: current.index + 1, revealed: false });
-  }
-
-  function choose(choice: number, fromKey = false) {
-    if (!session || session.finished) return;
-    const question = session.items[session.index];
-    if (!question) return;
-    const showsAnswer = session.mode === "study" || session.mode === "drill";
-
-    if (showsAnswer) {
-      const currentPick = session.picks[question.id];
-      if (session.revealed && currentPick === choice) {
-        if (!fromKey) advance(session);
-        return;
-      }
-      const firstPick = currentPick === undefined;
-      const picks = { ...session.picks, [question.id]: choice };
-      if (firstPick) remember(question.id, choice === question.answer);
-      setSession({ ...session, picks, revealed: true });
-      return;
-    }
-
-    advance({ ...session, picks: { ...session.picks, [question.id]: choice }, revealed: false });
-  }
-
-  function next() {
-    if (!session) return;
-    advance(session);
-  }
-
-  function previous() {
-    if (!session || session.finished || session.mode !== "exam" || session.index === 0) return;
-    scrollTop();
-    setSession({ ...session, index: session.index - 1, revealed: false });
+    setSession({ ...session, index: session.index + 1, revealed: false });
   }
 
   useEffect(() => {
@@ -545,7 +526,6 @@ export default function App() {
             onToggleShuffle={toggleShuffleAnswers}
             onChoose={choose}
             onNext={next}
-            onPrevious={session.mode === "exam" ? previous : undefined}
             onBack={
               session.fromChapter
                 ? backToChapter
@@ -1292,7 +1272,6 @@ function Quiz({
   onToggleShuffle,
   onChoose,
   onNext,
-  onPrevious,
   onBack,
 }: {
   session: Session;
@@ -1300,9 +1279,8 @@ function Quiz({
   shuffleAnswers: boolean;
   shuffleSeed: number;
   onToggleShuffle: () => void;
-  onChoose: (choice: number, fromKey?: boolean) => void;
+  onChoose: (choice: number) => void;
   onNext: () => void;
-  onPrevious?: () => void;
   onBack?: () => void;
 }) {
   useEffect(() => {
@@ -1311,19 +1289,13 @@ function Quiz({
       const target = event.target;
       if (target instanceof Element && target.closest(".quiz-back, .shuffle-switch")) return;
       const current = session.items[session.index];
-      if (event.key === "Enter") {
-        if (target instanceof Element && target.closest(".quiz-prev")) return;
-        if (!current || session.picks[current.id] === undefined) return;
-        event.preventDefault();
-        onNext();
-        return;
-      }
       const number = Number(event.key);
       if (current && number >= 1 && number <= 4 && !event.repeat) {
         const order = answerOrder(current.id, session.orders[current.id], shuffleAnswers, shuffleSeed);
         const choice = order[number - 1];
-        if (choice !== undefined) onChoose(choice, true);
+        if (choice !== undefined) onChoose(choice);
       }
+      if (event.key === "Enter") onNext();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -1385,15 +1357,10 @@ function Quiz({
   const pick = session.picks[current.id];
   const chapter = chapterById(current.chapter);
   const drilling = session.mode === "drill";
-  const showPrevious = Boolean(onPrevious) && session.index > 0;
+  const locked = (session.mode === "study" || drilling) && session.revealed;
   const label = drilling
     ? session.title
     : `${session.mode === "exam" ? "Practice test" : session.title === "All questions" ? session.title : "Study"} · ${chapter?.title}`;
-  const hint =
-    session.mode === "exam"
-      ? "Press 1–4 to answer and move on."
-      : "Press 1–4 to answer. Tap the choice again, or press Enter, to move on.";
-  const footClass = ["quiz-foot", drilling ? "drill-foot" : "", showPrevious ? "has-prev" : ""].filter(Boolean).join(" ");
 
   return (
     <section className="quiz">
@@ -1431,20 +1398,26 @@ function Quiz({
                 selected={selected}
                 correct={correct}
                 incorrect={incorrect}
+                disabled={locked}
                 onChoose={() => onChoose(choiceIndex)}
               />
             );
           })}
         </div>
         {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
-        <div className={footClass}>
-          {drilling ? <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p> : null}
-          <p className="quiz-hint">{hint}</p>
-          {showPrevious && onPrevious ? (
-            <button type="button" className="quiz-prev" onClick={onPrevious}>
-              Previous
-            </button>
-          ) : null}
+        <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
+          {drilling ? (
+            <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
+          ) : (
+            <p className="quiz-hint">
+              {session.mode === "exam"
+                ? "Answers stay hidden until the end. Press 1–4, then Enter."
+                : "Press 1–4 to answer. Enter for the next question."}
+            </p>
+          )}
+          <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
+            {drilling || session.index !== session.items.length - 1 ? "Next" : "See results"}
+          </button>
         </div>
       </article>
     </section>

@@ -1143,28 +1143,6 @@ button:focus-visible {
   flex: 0 0 auto;
 }
 
-.quiz-prev {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  margin-left: auto;
-  min-height: 2rem;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 0.875rem;
-  font-weight: 500;
-  letter-spacing: -0.011em;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.quiz-prev:hover {
-  color: var(--ink);
-}
-
 .progress {
   display: flex;
   justify-content: space-between;
@@ -2373,20 +2351,6 @@ button.choice {
     display: none;
   }
 
-  .quiz-foot:not(.drill-foot):not(.has-prev) {
-    display: none;
-  }
-
-  .quiz-foot.has-prev {
-    flex-direction: row;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .quiz-prev {
-    margin-left: 0;
-  }
-
   .quiz-foot.drill-foot {
     flex-direction: row;
     align-items: center;
@@ -2415,7 +2379,6 @@ button.choice {
   .user-button,
   .theme-control button,
   .quiz-back,
-  .quiz-prev,
   .text-button,
   .offline-install,
   .primary,
@@ -2439,7 +2402,6 @@ button.choice {
   .brand:active,
   .user-button:active,
   .quiz-back:active,
-  .quiz-prev:active,
   .account-close:active,
   .read-tabs button:active,
   .mode:active,
