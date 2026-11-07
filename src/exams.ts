@@ -84,12 +84,15 @@ async function upload(userId: string, tests: PracticeTest[]) {
     correct: test.correct,
   }));
   const { error } = await supabase.from("practice_tests").upsert(rows, { onConflict: "id", ignoreDuplicates: true });
-  if (!error) return;
+  if (!error) {
+    testsSavedLocally = false;
+    return;
+  }
   if (relationMissing(error)) {
     testsSavedLocally = true;
     return;
   }
-  console.warn("practice tests", error.message);
+  throw error;
 }
 
 async function fetchRemote(userId: string): Promise<PracticeTest[] | null> {
@@ -100,10 +103,13 @@ async function fetchRemote(userId: string): Promise<PracticeTest[] | null> {
     .eq("user_id", userId)
     .order("taken_at", { ascending: true });
   if (error) {
-    if (relationMissing(error)) testsSavedLocally = true;
-    else console.warn("practice tests", error.message);
-    return null;
+    if (relationMissing(error)) {
+      testsSavedLocally = true;
+      return null;
+    }
+    throw error;
   }
+  testsSavedLocally = false;
   return (data ?? []).flatMap((row) => {
     const test = {
       id: String(row.id),
@@ -116,7 +122,18 @@ async function fetchRemote(userId: string): Promise<PracticeTest[] | null> {
   });
 }
 
-export async function recordPracticeTest(
+let examChain: Promise<unknown> = Promise.resolve();
+
+function enqueueExam<T>(work: () => Promise<T>): Promise<T> {
+  const run = examChain.then(work, work);
+  examChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function recordPracticeTestNow(
   input: { length: number; correct: number },
   userId: string | null,
 ): Promise<PracticeTest[]> {
@@ -133,7 +150,14 @@ export async function recordPracticeTest(
   return next.filter((test) => test.owner === userId).sort((a, b) => a.at.localeCompare(b.at));
 }
 
-export async function syncPracticeTests(userId: string): Promise<PracticeTest[]> {
+export function recordPracticeTest(
+  input: { length: number; correct: number },
+  userId: string | null,
+): Promise<PracticeTest[]> {
+  return enqueueExam(() => recordPracticeTestNow(input, userId));
+}
+
+async function syncPracticeTestsNow(userId: string): Promise<PracticeTest[]> {
   const claimed = readAll().map((test) => (test.owner === null ? { ...test, owner: userId } : test));
   writeAll(claimed);
   const mine = claimed.filter((test) => test.owner === userId);
@@ -146,6 +170,10 @@ export async function syncPracticeTests(userId: string): Promise<PracticeTest[]>
   const merged = [...byId.values()].sort((a, b) => a.at.localeCompare(b.at));
   writeAll([...claimed.filter((test) => test.owner !== userId), ...merged]);
   return merged;
+}
+
+export function syncPracticeTests(userId: string): Promise<PracticeTest[]> {
+  return enqueueExam(() => syncPracticeTestsNow(userId));
 }
 
 export function scorePercent(test: PracticeTest): number {

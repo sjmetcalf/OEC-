@@ -1,17 +1,11 @@
+import { buildAnswerSync, sameAttempt, type AnswerBook, type Attempt } from "./answer-sync.ts";
 import { supabase } from "./supabase.ts";
 
-export type Attempt = {
-  seen: number;
-  correct: number;
-  last: boolean;
-};
+export type { Attempt };
 
-export type Stats = {
-  results: Record<string, Attempt>;
-  owner: string | null;
-};
+export type Stats = AnswerBook;
 
-const emptyStats: Stats = { results: {}, owner: null };
+const emptyStats: Stats = { results: {}, owner: null, synced: null };
 const storageKey = "oec-practice-v2";
 
 function isAttempt(value: unknown): value is Attempt {
@@ -47,7 +41,22 @@ export function loadStats(): Stats {
       const attempt = migrateAttempt(value);
       if (attempt) results[id] = attempt;
     }
-    return { results, owner: typeof parsed.owner === "string" ? parsed.owner : null };
+    const owner = typeof parsed.owner === "string" ? parsed.owner : null;
+    let synced: Record<string, Attempt> | null = null;
+    if (owner && parsed.synced && typeof parsed.synced === "object") {
+      const rows: Record<string, Attempt> = {};
+      let valid = true;
+      for (const [id, value] of Object.entries(parsed.synced)) {
+        const attempt = migrateAttempt(value);
+        if (!attempt) {
+          valid = false;
+          break;
+        }
+        rows[id] = attempt;
+      }
+      if (valid) synced = rows;
+    }
+    return { results, owner, synced };
   } catch {
     return emptyStats;
   }
@@ -151,6 +160,7 @@ function withAnswer(stats: Stats, id: string, correct: boolean, owner: string | 
       },
     },
     owner: owner ?? stats.owner,
+    synced: stats.synced,
   };
 }
 
@@ -159,15 +169,6 @@ export function recordLocal(id: string, correct: boolean, owner: string | null):
   saveStats(next);
   return next;
 }
-
-type AnswerWrite = {
-  user_id: string;
-  question_id: string;
-  correct: boolean;
-  seen_count: number;
-  correct_count: number;
-  updated_at: string;
-};
 
 function missingCountColumns(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -182,58 +183,53 @@ function missingCountColumns(error: unknown): boolean {
   );
 }
 
-async function uploadAnswers(rows: AnswerWrite[]) {
-  if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from("answers").upsert(rows, { onConflict: "user_id,question_id" });
-  if (error) throw error;
-}
-
-function rowsFromStats(userId: string, entries: Array<[string, boolean]>): AnswerWrite[] {
-  const stats = loadStats();
-  const updated_at = new Date().toISOString();
-  return entries.map(([question_id, correct]) => {
-    const attempt = stats.results[question_id];
-    return {
-      user_id: userId,
-      question_id,
-      correct: attempt?.last ?? correct,
-      seen_count: attempt?.seen ?? 1,
-      correct_count: attempt?.correct ?? (correct ? 1 : 0),
-      updated_at,
-    };
-  });
-}
-
-export async function recordRemote(userId: string, id: string, correct: boolean) {
-  try {
-    await uploadAnswers(rowsFromStats(userId, [[id, correct]]));
-  } catch (error) {
-    if (missingCountColumns(error)) {
-      countsSavedLocally = true;
-      return;
-    }
-    throw error;
+export function syncFailureMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string" && error.message) {
+    return error.message;
   }
+  return "Could not sync progress.";
 }
 
-export async function recordRemoteMany(userId: string, entries: Array<[string, boolean]>) {
-  try {
-    await uploadAnswers(rowsFromStats(userId, entries));
-  } catch (error) {
-    if (missingCountColumns(error)) {
-      countsSavedLocally = true;
-      return;
-    }
-    throw error;
+const pageSize = 1000;
+
+async function fetchRemoteAnswers(): Promise<{ rows: Record<string, Attempt>; counts: boolean }> {
+  if (!supabase) return { rows: {}, counts: true };
+  const counted = await fetchAnswerRows("question_id, correct, seen_count, correct_count");
+  if (!("error" in counted)) {
+    countsSavedLocally = false;
+    return { rows: counted.rows, counts: true };
   }
+  if (!missingCountColumns(counted.error)) throw counted.error;
+  countsSavedLocally = true;
+  const plain = await fetchAnswerRows("question_id, correct");
+  if ("error" in plain) throw plain.error;
+  return { rows: plain.rows, counts: false };
 }
 
-function attemptFromRemote(row: {
+async function fetchAnswerRows(columns: string): Promise<{ rows: Record<string, Attempt> } | { error: unknown }> {
+  if (!supabase) return { rows: {} };
+  const rows: Record<string, Attempt> = {};
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from("answers").select(columns).range(from, from + pageSize - 1);
+    if (error) return { error };
+    for (const row of (data ?? []) as RemoteAnswer[]) {
+      const attempt = attemptFromRemote(row);
+      if (attempt && typeof row.question_id === "string") rows[row.question_id] = attempt;
+    }
+    if ((data ?? []).length < pageSize) break;
+  }
+  return { rows };
+}
+
+type RemoteAnswer = {
   question_id?: unknown;
   correct?: unknown;
   seen_count?: unknown;
   correct_count?: unknown;
-}): Attempt | null {
+};
+
+function attemptFromRemote(row: RemoteAnswer): Attempt | null {
   if (typeof row.question_id !== "string" || typeof row.correct !== "boolean") return null;
   if (row.seen_count == null && row.correct_count == null) {
     return { seen: 1, correct: row.correct ? 1 : 0, last: row.correct };
@@ -245,38 +241,95 @@ function attemptFromRemote(row: {
   });
 }
 
-export async function mergeRemote(userId: string): Promise<Stats> {
+async function uploadAnswers(userId: string, attempts: Record<string, Attempt>, counts: boolean) {
+  if (!supabase) return;
+  const ids = Object.keys(attempts);
+  if (ids.length === 0) return;
+  const updated_at = new Date().toISOString();
+  const rows = ids.map((question_id) => {
+    const attempt = attempts[question_id]!;
+    const base = { user_id: userId, question_id, correct: attempt.last, updated_at };
+    if (!counts) return base;
+    return { ...base, seen_count: attempt.seen, correct_count: attempt.correct };
+  });
+  for (let index = 0; index < rows.length; index += 200) {
+    const { error } = await supabase.from("answers").upsert(rows.slice(index, index + 200), { onConflict: "user_id,question_id" });
+    if (error) throw error;
+  }
+}
+
+let syncChain: Promise<unknown> = Promise.resolve();
+
+function enqueueSync<T>(work: () => Promise<T>): Promise<T> {
+  const run = syncChain.then(work, work);
+  syncChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function sameUpload(left: Record<string, Attempt>, right: Record<string, Attempt>): boolean {
+  const ids = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const id of ids) {
+    const a = left[id];
+    const b = right[id];
+    if (!a || !b || !sameAttempt(a, b)) return false;
+  }
+  return true;
+}
+
+async function reconcile(userId: string): Promise<Stats> {
   if (!supabase) return loadStats();
-  const { data, error } = await supabase.from("answers").select("question_id, correct, seen_count, correct_count");
-  if (error) {
-    if (missingCountColumns(error)) {
-      countsSavedLocally = true;
-      return loadStats();
-    }
-    throw error;
-  }
-
-  const remote: Record<string, Attempt> = {};
-  for (const row of data ?? []) {
-    const attempt = attemptFromRemote(row);
-    if (attempt && typeof row.question_id === "string") remote[row.question_id] = attempt;
-  }
-
-  const local = loadStats();
-  const claimLocal = local.owner === null || local.owner === userId;
-  const missing = claimLocal ? Object.entries(local.results).filter(([id]) => !(id in remote)) : [];
-  if (missing.length > 0) {
-    await recordRemoteMany(
+  const started = loadStats();
+  const remote = await fetchRemoteAnswers();
+  let counts = remote.counts;
+  let uploaded: { upload: Record<string, Attempt>; synced: Record<string, Attempt> | null } | null = null;
+  for (let pass = 0; pass < 8; pass += 1) {
+    const latest = loadStats();
+    const plan = buildAnswerSync({
       userId,
-      missing.map(([id, attempt]) => [id, attempt.last]),
-    );
+      started,
+      remote: remote.rows,
+      countsOnServer: counts,
+      latest,
+    });
+    if (uploaded && sameUpload(uploaded.upload, plan.upload)) break;
+    try {
+      await uploadAnswers(userId, plan.upload, counts);
+    } catch (error) {
+      if (!counts || !missingCountColumns(error)) throw error;
+      counts = false;
+      countsSavedLocally = true;
+      await uploadAnswers(userId, plan.upload, false);
+    }
+    uploaded = { upload: plan.upload, synced: counts ? plan.synced : null };
   }
+  const finalPlan = buildAnswerSync({
+    userId,
+    started,
+    remote: remote.rows,
+    countsOnServer: counts,
+    latest: loadStats(),
+  });
+  const stable = uploaded ? sameUpload(uploaded.upload, finalPlan.upload) : false;
+  const stats: Stats = {
+    results: finalPlan.results,
+    owner: userId,
+    synced: counts ? (stable ? finalPlan.synced : uploaded?.synced ?? null) : null,
+  };
+  saveStats(stats);
+  return stats;
+}
 
-  const latest = loadStats();
-  const results: Record<string, Attempt> = claimLocal ? { ...latest.results } : {};
-  for (const [id, attempt] of Object.entries(remote)) results[id] = attempt;
+export function recordRemote(userId: string, _id: string, _correct: boolean) {
+  return enqueueSync(() => reconcile(userId));
+}
 
-  const merged = { results, owner: userId };
-  saveStats(merged);
-  return merged;
+export function recordRemoteMany(userId: string, _entries: Array<[string, boolean]>) {
+  return enqueueSync(() => reconcile(userId));
+}
+
+export function mergeRemote(userId: string): Promise<Stats> {
+  return enqueueSync(() => reconcile(userId));
 }

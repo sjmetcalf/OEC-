@@ -39,4 +39,53 @@ begin
   end if;
 end $$;
 
+-- Upsert updates an existing row, so the signed-in role needs update as well as insert.
+grant select, insert, update on table public.answers to authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'answers'
+      and cmd = 'SELECT'
+  ) then
+    create policy "Users read their own answers"
+      on public.answers
+      for select
+      to authenticated
+      using ((select auth.uid()) = user_id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'answers'
+      and cmd = 'INSERT'
+  ) then
+    create policy "Users insert their own answers"
+      on public.answers
+      for insert
+      to authenticated
+      with check ((select auth.uid()) = user_id);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'answers'
+      and cmd = 'UPDATE'
+  ) then
+    create policy "Users update their own answers"
+      on public.answers
+      for update
+      to authenticated
+      using ((select auth.uid()) = user_id)
+      with check ((select auth.uid()) = user_id);
+  end if;
+end $$;
+
 notify pgrst, 'reload schema';

@@ -15,6 +15,7 @@ import {
   recordLocal,
   recordRemote,
   recordRemoteMany,
+  syncFailureMessage,
   type Stats,
 } from "./progress.ts";
 import {
@@ -97,7 +98,7 @@ type ExamLength = (typeof examLengths)[number];
 function examLength(count: number): ExamLength | undefined {
   return examLengths.find((length) => length === count);
 }
-const emptyStats: Stats = { results: {}, owner: null };
+const emptyStats: Stats = { results: {}, owner: null, synced: null };
 
 function scrollTop() {
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
@@ -180,7 +181,7 @@ export default function App() {
               }
             })
             .catch((error: unknown) => {
-              setSyncError(error instanceof Error ? error.message : "Could not sync progress.");
+              setSyncError(syncFailureMessage(error));
               setStats(loadStats());
             });
         }
@@ -196,7 +197,7 @@ export default function App() {
     setSyncError(null);
     if (!owner) return;
     void recordRemote(owner, id, correct).catch((error: unknown) => {
-      setSyncError(error instanceof Error ? error.message : "Could not sync progress.");
+      setSyncError(syncFailureMessage(error));
     });
   }
 
@@ -208,7 +209,7 @@ export default function App() {
     setSyncError(null);
     if (!owner) return;
     void recordRemoteMany(owner, entries).catch((error: unknown) => {
-      setSyncError(error instanceof Error ? error.message : "Could not sync progress.");
+      setSyncError(syncFailureMessage(error));
     });
   }
 
@@ -382,12 +383,17 @@ export default function App() {
         rememberMany(session.items.map((item) => [item.id, session.picks[item.id] === item.answer]));
         void track("exam_finish");
         const owner = userIdRef.current;
-        void recordPracticeTest({ length: session.items.length, correct }, owner).then((rows) => {
-          if (userIdRef.current === owner) {
-            setTests(rows);
-            noteDeviceSave();
-          }
-        });
+        void recordPracticeTest({ length: session.items.length, correct }, owner)
+          .then((rows) => {
+            if (userIdRef.current === owner) {
+              setTests(rows);
+              noteDeviceSave();
+            }
+          })
+          .catch((error: unknown) => {
+            if (userIdRef.current === owner) setTests(loadPracticeTests(owner));
+            setSyncError(syncFailureMessage(error));
+          });
       }
       setSession({ ...session, finished: true, revealed: true });
       return;
