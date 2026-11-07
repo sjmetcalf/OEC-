@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
 import { BackButton } from "./BackButton.tsx";
+import { BlurText, CountUp } from "./bits.tsx";
+import { Threads } from "./threads.tsx";
 import { loadPracticeTests, practiceTestsSavedLocally, recordPracticeTest, syncPracticeTests, type PracticeTest } from "./exams.ts";
 import {
   attemptCountsSavedLocally,
@@ -475,7 +477,7 @@ export default function App() {
         </div>
       </header>
       <main
-        className={session || pickingExam || accountOpen ? "is-quiz" : reading ? "is-reading" : undefined}
+        className={session || pickingExam ? "is-quiz" : reading ? "is-reading" : undefined}
       >
         {syncError && (session || reading || pickingExam || accountOpen) ? (
           <p className="sync-error" role="alert">
@@ -666,6 +668,96 @@ function OfflineInstall() {
   );
 }
 
+function useModeGlow(rootRef: { current: HTMLDivElement | null }) {
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+    let raf = 0;
+    let last = 0;
+    const pointer = { x: -1e5, y: -1e5, live: false };
+    const light = { x: -1e5, y: -1e5, ready: false, near: 0 };
+    const heat = new WeakMap<HTMLElement, number>();
+
+    const frame = (now: number) => {
+      raf = 0;
+      const dt = Math.min(0.05, (now - last) / 1000 || 0);
+      last = now;
+      const bounds = root.getBoundingClientRect();
+      const margin = 150;
+      const nearTarget =
+        pointer.live &&
+        pointer.x > bounds.left - margin &&
+        pointer.x < bounds.right + margin &&
+        pointer.y > bounds.top - margin &&
+        pointer.y < bounds.bottom + margin
+          ? 1
+          : 0;
+      if (!light.ready && nearTarget) {
+        light.x = pointer.x;
+        light.y = pointer.y;
+        light.ready = true;
+      }
+      light.x += (pointer.x - light.x) * (1 - Math.exp(-dt / 0.05));
+      light.y += (pointer.y - light.y) * (1 - Math.exp(-dt / 0.05));
+      light.near += (nearTarget - light.near) * (1 - Math.exp(-dt / (nearTarget > light.near ? 0.12 : 0.4)));
+      let busy =
+        Math.abs(pointer.x - light.x) + Math.abs(pointer.y - light.y) > 0.3 || Math.abs(nearTarget - light.near) > 0.002;
+      if (Math.abs(nearTarget - light.near) < 0.002) light.near = nearTarget;
+
+      root.querySelectorAll<HTMLElement>(".mode").forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const px = pointer.x - rect.left;
+        const py = pointer.y - rect.top;
+        const inside = pointer.live && px >= 0 && py >= 0 && px <= rect.width && py <= rect.height;
+        const target = inside ? 1 : 0;
+        const current = heat.get(card) ?? 0;
+        let next = current + (target - current) * (1 - Math.exp(-dt / (target > current ? 0.14 : 0.32)));
+        if (Math.abs(target - next) < 0.002) next = target;
+        else busy = true;
+        heat.set(card, next);
+        card.style.setProperty("--mode-x", `${(light.x - rect.left).toFixed(1)}px`);
+        card.style.setProperty("--mode-y", `${(light.y - rect.top).toFixed(1)}px`);
+        card.style.setProperty("--mode-near", light.near.toFixed(3));
+        card.style.setProperty("--mode-hot", next.toFixed(3));
+      });
+
+      if (busy) raf = requestAnimationFrame(frame);
+    };
+
+    const wake = () => {
+      if (raf) return;
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    };
+
+    const onMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      pointer.live = true;
+      wake();
+    };
+
+    const onLeave = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      if (event.relatedTarget) return;
+      pointer.live = false;
+      wake();
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    document.addEventListener("pointerout", onLeave);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerout", onLeave);
+    };
+  }, [rootRef]);
+}
+
 function Home({
   stats,
   onStudy,
@@ -684,14 +776,30 @@ function Home({
   syncError: string | null;
 }) {
   const missed = missedIds(stats);
+  const modesRef = useRef<HTMLDivElement>(null);
+  useModeGlow(modesRef);
 
   return (
     <div className="pool">
       <div className="snowfield" aria-hidden="true">
-        <span className="snow-blob snow-sky" />
-        <span className="snow-blob snow-field" />
-        <span className="snow-blob snow-ridge" />
-        <span className="snow-blob snow-glow" />
+        <Threads
+          color="#a855f7"
+          midColor="#e879f9"
+          accentColor="#fb7185"
+          distance={1.4}
+          split={0.18}
+          waves={2.4}
+          thickness={0.8}
+          softness={0}
+          amplitude={0.8}
+          speed={0.2}
+          lineCount={64}
+          taper={0.55}
+          brightness={2}
+          fadeLeft={0.46}
+          opacity={0.42}
+          enableMouseInteraction
+        />
       </div>
       <header className="pool-intro">
         {syncError ? (
@@ -700,20 +808,29 @@ function Home({
           </p>
         ) : null}
         <p className="section-label">Outdoor Emergency Care</p>
-        <h1>Practice</h1>
-        <p className="lede">811 questions across the OEC chapters.</p>
+        <h1>
+          <BlurText text="Practice" />
+        </h1>
+        <p className="lede">
+          <CountUp to={questions.length} /> questions across the OEC chapters.
+        </p>
         <OfflineInstall />
       </header>
-      <div className="modes">
-        <button type="button" className="mode" onClick={onStudy}>
+      <div className="modes" ref={modesRef}>
+        <button type="button" className="mode mode-study" onClick={onStudy}>
+          <span className="mode-mark" aria-hidden="true" />
           <strong>All questions</strong>
-          <span>811 questions, one at a time. The answer shows as soon as you pick.</span>
+          <span>
+            <CountUp to={questions.length} /> questions, one at a time. The answer shows as soon as you pick.
+          </span>
         </button>
-        <button type="button" className="mode" onClick={onRead}>
+        <button type="button" className="mode mode-chapter" onClick={onRead}>
+          <span className="mode-mark" aria-hidden="true" />
           <strong>Chapter questions</strong>
           <span>Every question in one chapter, with the correct answer marked.</span>
         </button>
-        <button type="button" className="mode" onClick={onExam}>
+        <button type="button" className="mode mode-exam" onClick={onExam}>
+          <span className="mode-mark" aria-hidden="true" />
           <strong>Practice test</strong>
           <span>Mixed questions. Answers stay hidden until the end.</span>
         </button>
@@ -750,7 +867,7 @@ function Home({
                   <span style={{ width: `${width}%` }} />
                 </span>
                 <span className="chapter-row-count">
-                  {seen}/{pool.length}
+                  <CountUp to={seen} />/<CountUp to={pool.length} />
                 </span>
               </button>
             );
@@ -917,23 +1034,59 @@ function ExamLength({
   );
 }
 
+function ChoiceOption({
+  letter,
+  text,
+  selected,
+  correct,
+  incorrect,
+  disabled,
+  onChoose,
+}: {
+  letter: string;
+  text: string;
+  selected?: boolean;
+  correct?: boolean;
+  incorrect?: boolean;
+  disabled?: boolean;
+  onChoose?: () => void;
+}) {
+  const className = ["choice", selected ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const body = (
+    <>
+      <span>{letter}</span>
+      {text}
+    </>
+  );
+  if (onChoose) {
+    return (
+      <button type="button" className={className} disabled={disabled} onClick={onChoose}>
+        {body}
+      </button>
+    );
+  }
+  return <li className={className}>{body}</li>;
+}
+
 function ChapterStat({ label, value, detail }: { label: string; value: number; detail: string }) {
   return (
     <div className="read-meter">
-      <div className="read-meter-top">
-        <span>{label}</span>
+      <span className="read-meter-top">
+        {label}
         <strong>{value}%</strong>
-      </div>
-      <div
+      </span>
+      <span
         className="meter read-meter-bar"
         role="meter"
         aria-label={detail}
+        aria-valuenow={value}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={value}
       >
         <span style={{ width: `${value}%` }} />
-      </div>
+      </span>
     </div>
   );
 }
@@ -1061,15 +1214,17 @@ function ReadPool({
               {index + 1} / {pool.length}
             </p>
             <h2>{question.prompt}</h2>
-            <ol className="qchoices">
+            <ol className="choices">
               {answerOrder(question.id, undefined, shuffleAnswers, shuffleSeed).map((choiceIndex, displayIndex) => {
                 const correct = choiceIndex === question.answer;
                 if (hideDistractors && !correct) return null;
                 return (
-                  <li key={choiceIndex} className={correct ? "correct" : ""}>
-                    <span>{letters[displayIndex]}</span>
-                    {question.choices[choiceIndex]}
-                  </li>
+                  <ChoiceOption
+                    key={choiceIndex}
+                    letter={letters[displayIndex]}
+                    text={question.choices[choiceIndex]}
+                    correct={correct}
+                  />
                 );
               })}
             </ol>
@@ -1207,20 +1362,17 @@ function Quiz({
             const selected = pick === choiceIndex;
             const correct = session.revealed && choiceIndex === current.answer;
             const incorrect = session.revealed && selected && choiceIndex !== current.answer;
-            const className = ["choice", selected ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""]
-              .filter(Boolean)
-              .join(" ");
             return (
-              <button
+              <ChoiceOption
                 key={choiceIndex}
-                type="button"
-                className={className}
+                letter={letters[displayIndex]}
+                text={current.choices[choiceIndex]}
+                selected={selected}
+                correct={correct}
+                incorrect={incorrect}
                 disabled={locked}
-                onClick={() => onChoose(choiceIndex)}
-              >
-                <span>{letters[displayIndex]}</span>
-                {current.choices[choiceIndex]}
-              </button>
+                onChoose={() => onChoose(choiceIndex)}
+              />
             );
           })}
         </div>
@@ -1229,7 +1381,7 @@ function Quiz({
           {drilling ? (
             <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
           ) : (
-            <p>
+            <p className="quiz-hint">
               {session.mode === "exam"
                 ? "Answers stay hidden until the end. Press 1–4, then Enter."
                 : "Press 1–4 to answer. Enter for the next question."}

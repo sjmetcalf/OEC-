@@ -1,5 +1,9 @@
+import { useMemo } from "react";
 import { BackButton } from "./BackButton.tsx";
+import { CountUp } from "./bits.tsx";
+import { CometDial } from "./comet-dial.tsx";
 import { scorePercent, type PracticeTest } from "./exams.ts";
+import { MagicBento } from "./magic-bento.tsx";
 import type { StudyCoverage } from "./progress.ts";
 
 const examLine = 80;
@@ -89,6 +93,132 @@ export default function AccountPage({
         ? "Your last test clears the exam line."
         : "Your last test is under the exam line.";
 
+  const stats = useMemo(
+    () => [
+      {
+        id: "aptitude",
+        content: (
+          <div className="account-stat">
+            <header className="account-card-head">
+              <h2>Aptitude</h2>
+              <p>Correct answers out of every try.</p>
+            </header>
+            <CometDial
+              className="stat-dial"
+              value={aptitude}
+              label="Aptitude, correct answers out of every try"
+              unit="%"
+              size={152}
+              accent="#a855f7"
+              ink="#3d2a5c"
+              disabled
+            />
+            {missed > 0 || lower.length > 0 ? (
+              <div className="account-stat-foot">
+                {lower.length > 0 ? (
+                  <ul className="account-weak">
+                    {lower.map((chapter) => (
+                      <li key={chapter.id}>
+                        <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
+                          {chapter.title}
+                          <span>{chapter.aptitude}%</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {missed > 0 ? (
+                  <button className="primary account-next" type="button" onClick={onStudyMissed}>
+                    Study {missed} missed {missed === 1 ? "question" : "questions"}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ),
+      },
+      {
+        id: "questions",
+        content: (
+          <div className="account-stat">
+            <header className="account-card-head">
+              <h2>Questions</h2>
+              <p>
+                {coverage.seen} of {coverage.total} seen
+              </p>
+            </header>
+            <CometDial
+              className="stat-dial"
+              value={seenPercent}
+              label={`${coverage.seen} of ${coverage.total} questions seen`}
+              unit="%"
+              size={152}
+              accent="#fb7185"
+              ink="#3d2a5c"
+              disabled
+            />
+            <div className="account-stat-foot">
+              <div className="account-stat-row account-coverage">
+                <div>
+                  <span>Correct</span>
+                  <strong>{coverage.correct}</strong>
+                </div>
+                <div>
+                  <span>Missed</span>
+                  <strong>{coverage.missed}</strong>
+                </div>
+                <div>
+                  <span>Chapters</span>
+                  <strong>
+                    {coverage.chaptersStarted}
+                    <span>/{coverage.chapterCount}</span>
+                  </strong>
+                </div>
+              </div>
+              <p className="account-caption">Latest answer for each question. A chapter counts once any question in it has been seen.</p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "tests",
+        colSpan: 2,
+        content: (
+          <>
+            <header className="account-card-head">
+              <h2>Practice tests</h2>
+              <p>
+                {tests.length === 0 ? "No finished tests yet." : `${tests.length} finished ${tests.length === 1 ? "test" : "tests"}`}
+              </p>
+            </header>
+            {tests.length > 0 ? (
+              <>
+                <div className="account-stat-row">
+                  <div>
+                    <span>Recent</span>
+                    <strong>{recent === undefined ? "—" : <><CountUp to={recent} />%</>}</strong>
+                  </div>
+                  <div>
+                    <span>Best</span>
+                    <strong>{best === null ? "—" : <><CountUp to={best} />%</>}</strong>
+                  </div>
+                  <div>
+                    <span>Average</span>
+                    <strong>{average === null ? "—" : <><CountUp to={average} />%</>}</strong>
+                  </div>
+                </div>
+                <ScoreChart tests={tests} />
+                <p className="account-caption">Dashed line = 80% OEC exam line.</p>
+                <p className="account-readiness">{readiness}</p>
+              </>
+            ) : null}
+          </>
+        ),
+      },
+    ],
+    [aptitude, average, best, coverage, lower, missed, onStudyChapter, onStudyMissed, readiness, recent, seenPercent, tests],
+  );
+
   return (
     <section className="account-page">
       <div className="drill-meta">
@@ -100,103 +230,17 @@ export default function AccountPage({
         <p className="lede">{email}</p>
         {deviceNote ? <p className="account-local">{deviceNote}</p> : null}
       </header>
-      <div className="account-stats">
-        <article className="account-card">
-          <header className="account-card-head">
-            <h2>Aptitude</h2>
-            <p>Correct answers out of every try.</p>
-          </header>
-          <p className="account-hero">
-            {aptitude}
-            <span>%</span>
-          </p>
-          <div className="meter account-aptitude" role="meter" aria-label={`Aptitude ${aptitude}%`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={aptitude}>
-            <span style={{ width: `${aptitude}%` }} />
-          </div>
-          {missed > 0 ? (
-            <button className="primary account-next" type="button" onClick={onStudyMissed}>
-              Study {missed} missed {missed === 1 ? "question" : "questions"}
-            </button>
-          ) : null}
-          {lower.length > 0 ? (
-            <ul className="account-weak">
-              {lower.map((chapter) => (
-                <li key={chapter.id}>
-                  <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
-                    {chapter.title}
-                    <span>{chapter.aptitude}%</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </article>
-        <article className="account-card">
-          <header className="account-card-head">
-            <h2>Practice tests</h2>
-            <p>
-              {tests.length === 0 ? "No finished tests yet." : `${tests.length} finished ${tests.length === 1 ? "test" : "tests"}`}
-            </p>
-          </header>
-          {tests.length > 0 ? (
-            <>
-          <div className="account-stat-row">
-            <div>
-              <span>Recent</span>
-              <strong>{recent === undefined ? "—" : `${recent}%`}</strong>
-            </div>
-            <div>
-              <span>Best</span>
-              <strong>{best === null ? "—" : `${best}%`}</strong>
-            </div>
-            <div>
-              <span>Average</span>
-              <strong>{average === null ? "—" : `${average}%`}</strong>
-            </div>
-          </div>
-          <ScoreChart tests={tests} />
-          <p className="account-caption">Dashed line = 80% OEC exam line.</p>
-          <p className="account-readiness">{readiness}</p>
-            </>
-          ) : null}
-        </article>
-        <article className="account-card">
-          <header className="account-card-head">
-            <h2>Questions</h2>
-            <p>
-              {coverage.seen} of {coverage.total} seen
-            </p>
-          </header>
-          <div
-            className="meter account-seen"
-            role="meter"
-            aria-label={`${coverage.seen} of ${coverage.total} questions seen`}
-            aria-valuemin={0}
-            aria-valuemax={coverage.total}
-            aria-valuenow={coverage.seen}
-          >
-            <span style={{ width: `${seenPercent}%` }} />
-          </div>
-          <div className="account-stat-row account-coverage">
-            <div>
-              <span>Correct</span>
-              <strong>{coverage.correct}</strong>
-            </div>
-            <div>
-              <span>Missed</span>
-              <strong>{coverage.missed}</strong>
-            </div>
-            <div>
-              <span>Chapters</span>
-              <strong>
-                {coverage.chaptersStarted}
-                <span>/{coverage.chapterCount}</span>
-              </strong>
-            </div>
-          </div>
-          <p className="account-caption">Correct and missed follow the latest answer. A chapter counts once any question in it has been seen.</p>
-        </article>
-      </div>
+      <MagicBento
+        className="account-bento"
+        theme="light"
+        columns={2}
+        gap={14}
+        radius={12}
+        glowColor="#a855f7"
+        textAutoHide={false}
+        enableStars={false}
+        items={stats}
+      />
       <button className="ghost account-sign-out" type="button" disabled={busy} onClick={onSignOut}>
         Sign out
       </button>
