@@ -14,6 +14,23 @@
       content="Unofficial Outdoor Emergency Care practice: all questions with answers shown immediately, a chapter's questions with the correct answer marked, or a practice test of 10 to 100 questions."
     />
     <link rel="icon" href="/favicon.svg" />
+    <script>
+      (function () {
+        var choice = "system";
+        try {
+          var stored = localStorage.getItem("oec-theme");
+          if (stored === "light" || stored === "dark" || stored === "system") choice = stored;
+        } catch (e) {}
+        var dark =
+          choice === "dark" ||
+          (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        var root = document.documentElement;
+        root.setAttribute("data-theme", dark ? "dark" : "light");
+        root.style.colorScheme = dark ? "dark" : "light";
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute("content", dark ? "#16121f" : "#a855f7");
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

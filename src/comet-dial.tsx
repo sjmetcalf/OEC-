@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 
 import "./comet-dial.css";
 
@@ -198,6 +198,7 @@ const CometDial = ({
   className = ''
 }: CometDialProps) => {
   const reduce = useReducedMotion();
+  const gradientId = `comet-brand-${useId().replace(/:/g, "")}`;
   const [dragging, setDragging] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const litRef = useRef<SVGPathElement>(null);
@@ -466,6 +467,7 @@ const CometDial = ({
         {
           '--cd-accent': accent,
           '--cd-ink': ink,
+          '--cd-stroke': `url(#${gradientId})`,
           '--cd-size': `${size}px`,
           '--cd-figure': `${Math.round(size * 0.16)}px`
         } as CSSProperties
@@ -486,6 +488,13 @@ const CometDial = ({
         onPointerDown={down}
         onKeyDown={key}
       >
+        <defs>
+          <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1="20" y1="100" x2="180" y2="100">
+            <stop offset="0%" stopColor="var(--accent)" />
+            <stop offset="42%" stopColor="var(--accent-mid)" />
+            <stop offset="100%" stopColor="var(--accent-warm)" />
+          </linearGradient>
+        </defs>
         <path className="comet-dial__track" d={arcPath(start, end)} strokeWidth={thickness} />
         <path ref={litRef} className="comet-dial__lit" strokeWidth={thickness} />
         <g className="comet-dial__comet">

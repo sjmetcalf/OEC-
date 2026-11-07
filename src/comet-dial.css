@@ -43,16 +43,16 @@
 }
 
 .comet-dial__lit {
-  stroke: var(--cd-accent);
+  stroke: var(--cd-stroke, var(--cd-accent));
   opacity: 0.7;
 }
 
 .comet-dial__comet path {
-  stroke: var(--cd-accent);
+  stroke: var(--cd-stroke, var(--cd-accent));
 }
 
 .comet-dial__head {
-  fill: var(--cd-accent);
+  fill: var(--cd-stroke, var(--cd-accent));
 }
 
 .comet-dial__readout {

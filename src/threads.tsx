@@ -193,9 +193,17 @@ float smootherstep(float edge, float x) {
 }
 
 vec3 brand(float t) {
-  const float stop = 0.42;
-  if (t < stop) return mix(uColor, uMid, t / stop);
-  return mix(uMid, uAccent, (t - stop) / (1.0 - stop));
+  float x = clamp((t - 0.16) / 0.70, 0.0, 1.0);
+  const float stop = 0.36;
+  if (x < stop) return mix(uColor, uMid, x / stop);
+  return mix(uMid, uAccent, (x - stop) / (1.0 - stop));
+}
+
+vec3 present(vec3 ink) {
+  float peak = max(ink.r, max(ink.g, ink.b));
+  float floorC = min(ink.r, min(ink.g, ink.b));
+  vec3 hue = (ink - floorC) / max(peak - floorC, 0.0001);
+  return clamp(mix(ink, hue, 0.72), 0.0, 1.0);
 }
 
 void main() {
@@ -208,9 +216,11 @@ void main() {
     mask *= smootherstep(edge, px.x) * smootherstep(edge, uResolution.x - px.x);
     mask *= smootherstep(edge, px.y) * smootherstep(edge, uResolution.y - px.y);
   }
-  float coverage = pow(max(alpha, 0.0), uCurve) * mask;
+  float spine = pow(max(alpha, 0.0), uCurve);
+  spine = 1.0 - pow(max(1.0 - spine, 0.0), 1.85);
+  float coverage = spine * mask;
   coverage *= smootherstep(max(uFadeLeft, 0.0001), vUv.x);
-  outColor = vec4(brand(vUv.x) * coverage, coverage);
+  outColor = vec4(present(brand(vUv.x)) * coverage, coverage);
 }`;
 
 const MAX_RENDER_DIM = 1920;

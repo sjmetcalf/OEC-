@@ -26,6 +26,13 @@ function ScoreChart({ tests }: { tests: PracticeTest[] }) {
 
   return (
     <svg className="score-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+      <defs>
+        <linearGradient id="score-brand" gradientUnits="userSpaceOnUse" x1={pad.left} y1="0" x2={width - pad.right} y2="0">
+          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="42%" stopColor="var(--accent-mid)" />
+          <stop offset="100%" stopColor="var(--accent-warm)" />
+        </linearGradient>
+      </defs>
       {[0, examLine, 100].map((mark) => (
         <g key={mark}>
           <line
@@ -40,7 +47,7 @@ function ScoreChart({ tests }: { tests: PracticeTest[] }) {
           </text>
         </g>
       ))}
-      {points.length > 1 ? <path className="score-chart-line" d={line} /> : null}
+      {points.length > 1 ? <path className="score-chart-line" d={line} stroke="url(#score-brand)" /> : null}
       {points.map((point, index) => (
         <circle
           key={tests[index]?.id ?? index}
@@ -48,6 +55,7 @@ function ScoreChart({ tests }: { tests: PracticeTest[] }) {
           cx={point.x}
           cy={point.y}
           r={5}
+          stroke="url(#score-brand)"
         />
       ))}
     </svg>
@@ -59,12 +67,10 @@ export default function AccountPage({
   tests,
   aptitude,
   coverage,
-  missed,
   lower,
   deviceNote,
   busy,
   onBack,
-  onStudyMissed,
   onStudyChapter,
   onSignOut,
 }: {
@@ -72,12 +78,10 @@ export default function AccountPage({
   tests: PracticeTest[];
   aptitude: number;
   coverage: StudyCoverage;
-  missed: number;
   lower: Array<{ id: string; title: string; aptitude: number }>;
   deviceNote: string | null;
   busy: boolean;
   onBack: () => void;
-  onStudyMissed: () => void;
   onStudyChapter: (chapterId: string) => void;
   onSignOut: () => void;
 }) {
@@ -109,29 +113,24 @@ export default function AccountPage({
               label="Aptitude, correct answers out of every try"
               unit="%"
               size={152}
-              accent="#a855f7"
-              ink="#3d2a5c"
+              accent="var(--accent)"
+              ink="var(--ink)"
               disabled
             />
-            {missed > 0 || lower.length > 0 ? (
+            {lower.length > 0 ? (
               <div className="account-stat-foot">
-                {lower.length > 0 ? (
+                <div className="account-weak-block">
                   <ul className="account-weak">
                     {lower.map((chapter) => (
                       <li key={chapter.id}>
                         <button className="text-button" type="button" onClick={() => onStudyChapter(chapter.id)}>
-                          {chapter.title}
-                          <span>{chapter.aptitude}%</span>
+                          <span className="account-weak-name">{chapter.title}</span>
+                          <strong>{chapter.aptitude}%</strong>
                         </button>
                       </li>
                     ))}
                   </ul>
-                ) : null}
-                {missed > 0 ? (
-                  <button className="primary account-next" type="button" onClick={onStudyMissed}>
-                    Study {missed} missed {missed === 1 ? "question" : "questions"}
-                  </button>
-                ) : null}
+                </div>
               </div>
             ) : null}
           </div>
@@ -153,8 +152,8 @@ export default function AccountPage({
               label={`${coverage.seen} of ${coverage.total} questions seen`}
               unit="%"
               size={152}
-              accent="#fb7185"
-              ink="#3d2a5c"
+              accent="var(--accent-warm)"
+              ink="var(--ink)"
               disabled
             />
             <div className="account-stat-foot">
@@ -175,7 +174,6 @@ export default function AccountPage({
                   </strong>
                 </div>
               </div>
-              <p className="account-caption">Latest answer for each question. A chapter counts once any question in it has been seen.</p>
             </div>
           </div>
         ),
@@ -216,7 +214,7 @@ export default function AccountPage({
         ),
       },
     ],
-    [aptitude, average, best, coverage, lower, missed, onStudyChapter, onStudyMissed, readiness, recent, seenPercent, tests],
+    [aptitude, average, best, coverage, lower, onStudyChapter, readiness, recent, seenPercent, tests],
   );
 
   return (
@@ -234,6 +232,7 @@ export default function AccountPage({
         className="account-bento"
         theme="light"
         columns={2}
+        minCell={112}
         gap={14}
         radius={12}
         glowColor="#a855f7"

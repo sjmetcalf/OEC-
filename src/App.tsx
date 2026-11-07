@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
+import { ThemeControl } from "./theme.tsx";
 import { BackButton } from "./BackButton.tsx";
 import { BlurText, CountUp } from "./bits.tsx";
 import { Threads } from "./threads.tsx";
@@ -455,6 +456,7 @@ export default function App() {
             </button>
           </div>
           <div className="topbar-actions">
+            <ThemeControl />
             {supabase && (
               <Account
                 email={userEmail}
@@ -495,7 +497,6 @@ export default function App() {
               ).aptitude
             }
             coverage={studyCoverage(stats.results, questions)}
-            missed={missedIds(stats).length}
             lower={lowerChapters(stats.results, questions).map((chapter) => ({
               ...chapter,
               title: chapterById(chapter.id)?.title ?? chapter.id,
@@ -505,11 +506,6 @@ export default function App() {
             onBack={() => {
               setAccountOpen(false);
               scrollTop();
-            }}
-            onStudyMissed={() => {
-              const missed = questions.filter((question) => missedIds(stats).includes(question.id));
-              setAccountOpen(false);
-              start("study", missed, "Missed questions");
             }}
             onStudyChapter={(chapterId) => {
               const chapter = chapterById(chapterId);
@@ -793,11 +789,11 @@ function Home({
           softness={0}
           amplitude={0.8}
           speed={0.2}
-          lineCount={64}
+          lineCount={77}
           taper={0.55}
           brightness={2}
           fadeLeft={0.46}
-          opacity={0.42}
+          opacity={0.68}
           enableMouseInteraction
         />
       </div>

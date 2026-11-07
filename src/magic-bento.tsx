@@ -51,6 +51,8 @@ export interface MagicBentoProps {
   clickEffect?: boolean;
   intro?: boolean;
   disableAnimations?: boolean;
+  /** Narrowest column before this bento drops a column. */
+  minCell?: number;
   onItemClick?: (item: MagicBentoItem, index: number) => void;
   className?: string;
   style?: CSSProperties;
@@ -70,6 +72,7 @@ interface Settings {
   clickEffect: boolean;
   intro: boolean;
   disableAnimations: boolean;
+  minCell: number;
   onItemClick?: (item: MagicBentoItem, index: number) => void;
   glow: number[];
 }
@@ -567,6 +570,7 @@ const MagicBento = ({
   clickEffect = true,
   intro = true,
   disableAnimations = false,
+  minCell = MIN_CELL,
   onItemClick,
   className = '',
   style
@@ -594,6 +598,7 @@ const MagicBento = ({
     clickEffect,
     intro,
     disableAnimations,
+    minCell: Math.max(80, minCell),
     onItemClick,
     glow
   };
@@ -981,7 +986,7 @@ const MagicBento = ({
       const s = settingsRef.current;
       const width = root.clientWidth;
       const cell = (count: number) => (width - s.gap * (count - 1)) / count;
-      const next = cell(s.columns) >= MIN_CELL ? s.columns : s.columns >= 2 && cell(2) >= MIN_PAIR ? 2 : 1;
+      const next = cell(s.columns) >= s.minCell ? s.columns : s.columns >= 2 && cell(2) >= MIN_PAIR ? 2 : 1;
       setCols(next);
       dirty = true;
       wake();
