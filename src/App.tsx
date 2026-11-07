@@ -8,7 +8,6 @@ import { Threads } from "./threads.tsx";
 import { loadPracticeTests, practiceTestsSavedLocally, recordPracticeTest, syncPracticeTests, type PracticeTest } from "./exams.ts";
 import {
   attemptCountsSavedLocally,
-  attemptTally,
   chapterMeters,
   loadStats,
   lowerChapters,
@@ -19,6 +18,7 @@ import {
   recordRemote,
   recordRemoteMany,
   syncFailureMessage,
+  type Attempt,
   type Stats,
 } from "./progress.ts";
 import {
@@ -1264,6 +1264,20 @@ function ReadPool({
   );
 }
 
+function AttemptScore({ attempt }: { attempt: Attempt | undefined }) {
+  if (!attempt || attempt.seen < 1) return null;
+  const perfect = attempt.correct === attempt.seen;
+  return (
+    <p className={perfect ? "attempt-tally perfect" : "attempt-tally"} aria-label={`${attempt.correct} correct of ${attempt.seen}`}>
+      <strong>
+        {attempt.correct}
+        <span>/{attempt.seen}</span>
+      </strong>
+      correct
+    </p>
+  );
+}
+
 function Quiz({
   session,
   stats,
@@ -1407,7 +1421,7 @@ function Quiz({
         {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
         <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
           {drilling ? (
-            <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
+            <AttemptScore attempt={stats.results[current.id]} />
           ) : (
             <p className="quiz-hint">
               {session.mode === "exam"
