@@ -1543,6 +1543,18 @@ button:focus-visible {
   color: var(--ink);
 }
 
+.quiz-tools {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0.15rem 0 0.85rem;
+}
+
+.ghost.shuffle-toggle[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 6%, var(--white));
+  color: var(--ink);
+}
+
 .exam-start {
   justify-self: start;
   width: auto;

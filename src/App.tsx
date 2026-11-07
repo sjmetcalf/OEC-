@@ -39,18 +39,58 @@ import { supabase } from "./supabase.ts";
 
 type Mode = "study" | "exam" | "drill";
 
+type ChoiceOrder = [number, number, number, number];
+
 type Session = {
   mode: Mode;
   title: string;
   items: Question[];
   index: number;
   picks: Record<string, number>;
+  orders: Record<string, ChoiceOrder>;
   revealed: boolean;
   finished: boolean;
   fromChapter?: string;
 };
 
 const letters = ["A", "B", "C", "D"] as const;
+const straightOrder: ChoiceOrder = [0, 1, 2, 3];
+const shuffleAnswersKey = "oec-shuffle-answers";
+
+function readShuffleAnswers() {
+  try {
+    return localStorage.getItem(shuffleAnswersKey) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function shuffledOrder(questionId: string, seed: number): ChoiceOrder {
+  const order: ChoiceOrder = [0, 1, 2, 3];
+  let state = (hashString(questionId) ^ seed) >>> 0;
+  for (let index = order.length - 1; index > 0; index -= 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const swap = state % (index + 1);
+    const current = order[index]!;
+    order[index] = order[swap]!;
+    order[swap] = current;
+  }
+  return order;
+}
+
+function answerOrder(questionId: string, saved: ChoiceOrder | undefined, shuffleAnswers: boolean, seed: number): ChoiceOrder {
+  if (saved) return saved;
+  return shuffleAnswers ? shuffledOrder(questionId, seed) : straightOrder;
+}
 const examLengths = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 type ExamLength = (typeof examLengths)[number];
 
@@ -89,6 +129,8 @@ export default function App() {
   const [reading, setReading] = useState<string | null>(null);
   const [pickingExam, setPickingExam] = useState(false);
   const [hideDistractors, setHideDistractors] = useState(false);
+  const [shuffleAnswers, setShuffleAnswers] = useState(readShuffleAnswers);
+  const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [tests, setTests] = useState<PracticeTest[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -235,6 +277,7 @@ export default function App() {
       items: shuffle(source),
       index: 0,
       picks: {},
+      orders: {},
       revealed: false,
       finished: false,
       fromChapter,
@@ -243,6 +286,38 @@ export default function App() {
     if (mode === "exam" && length) void track("exam_start", { length });
     scrollTop();
   }
+
+  function toggleShuffleAnswers() {
+    const next = !shuffleAnswers;
+    try {
+      localStorage.setItem(shuffleAnswersKey, next ? "1" : "0");
+    } catch {
+      // The choice still applies for this visit.
+    }
+    if (next) setShuffleSeed(Math.floor(Math.random() * 0x7fffffff));
+    setShuffleAnswers(next);
+    setSession((current) => {
+      if (!current || current.finished) return current;
+      const question = current.items[current.index];
+      if (!question || current.picks[question.id] !== undefined || !current.orders[question.id]) return current;
+      const orders = { ...current.orders };
+      delete orders[question.id];
+      return { ...current, orders };
+    });
+  }
+
+  useEffect(() => {
+    if (!session || session.finished) return;
+    const current = session.items[session.index];
+    if (!current || session.orders[current.id]) return;
+    const order = shuffleAnswers ? shuffledOrder(current.id, shuffleSeed) : straightOrder;
+    setSession((existing) => {
+      if (!existing || existing.finished) return existing;
+      const question = existing.items[existing.index];
+      if (!question || question.id !== current.id || existing.orders[question.id]) return existing;
+      return { ...existing, orders: { ...existing.orders, [question.id]: order } };
+    });
+  }, [session, shuffleAnswers, shuffleSeed]);
 
   function home() {
     setSession(null);
@@ -289,11 +364,13 @@ export default function App() {
     const last = session.index === session.items.length - 1;
     scrollTop();
     if (last && session.mode === "drill") {
+      if (shuffleAnswers) setShuffleSeed(Math.floor(Math.random() * 0x7fffffff));
       setSession({
         ...session,
         items: continueDeck(session.items, current.id),
         index: 0,
         picks: {},
+        orders: {},
         revealed: false,
         finished: false,
       });
@@ -440,6 +517,9 @@ export default function App() {
           <Quiz
             session={session}
             stats={stats}
+            shuffleAnswers={shuffleAnswers}
+            shuffleSeed={shuffleSeed}
+            onToggleShuffle={toggleShuffleAnswers}
             onChoose={choose}
             onNext={next}
             onBack={
@@ -457,9 +537,12 @@ export default function App() {
             chapterId={reading}
             stats={stats}
             hideDistractors={hideDistractors}
+            shuffleAnswers={shuffleAnswers}
+            shuffleSeed={shuffleSeed}
             onBack={home}
             onChapter={setReading}
             onToggleDistractors={() => setHideDistractors((value) => !value)}
+            onToggleShuffle={toggleShuffleAnswers}
             onStudy={(chapterId) => {
               const chapter = chapterById(chapterId);
               start("drill", questionsIn(chapterId), chapter?.title ?? "Study", undefined, chapterId);
@@ -468,6 +551,8 @@ export default function App() {
         ) : pickingExam ? (
           <ExamLength
             onBack={home}
+            shuffleAnswers={shuffleAnswers}
+            onToggleShuffle={toggleShuffleAnswers}
             onExam={(count, chapterIds) => {
               const pool = chapterIds.flatMap((id) => questionsIn(id));
               start("exam", shuffle(pool).slice(0, count), `${count}-question practice test`, examLength(count));
@@ -670,12 +755,24 @@ function Home({
   );
 }
 
+function ShuffleToggle({ pressed, onClick }: { pressed: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="ghost shuffle-toggle" aria-pressed={pressed} onClick={onClick}>
+      {pressed ? "Answers shuffled" : "Shuffle answers"}
+    </button>
+  );
+}
+
 function ExamLength({
   onBack,
   onExam,
+  shuffleAnswers,
+  onToggleShuffle,
 }: {
   onBack: () => void;
   onExam: (count: number, chapterIds: string[]) => void;
+  shuffleAnswers: boolean;
+  onToggleShuffle: () => void;
 }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(chapters.map((chapter) => chapter.id)));
   const [count, setCount] = useState(10);
@@ -793,6 +890,7 @@ function ExamLength({
           </div>
         </div>
       </details>
+      <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
       <button
         type="button"
         className="primary exam-start"
@@ -835,17 +933,23 @@ function ReadPool({
   chapterId,
   stats,
   hideDistractors,
+  shuffleAnswers,
+  shuffleSeed,
   onBack,
   onChapter,
   onToggleDistractors,
+  onToggleShuffle,
   onStudy,
 }: {
   chapterId: string;
   stats: Stats;
   hideDistractors: boolean;
+  shuffleAnswers: boolean;
+  shuffleSeed: number;
   onBack: () => void;
   onChapter: (chapterId: string) => void;
   onToggleDistractors: () => void;
+  onToggleShuffle: () => void;
   onStudy: (chapterId: string) => void;
 }) {
   const chapter = chapterById(chapterId) ?? chapters[0];
@@ -926,6 +1030,7 @@ function ReadPool({
           <button type="button" className="ghost" aria-pressed={hideDistractors} onClick={onToggleDistractors}>
             {hideDistractors ? "Show choices" : "Hide distractors"}
           </button>
+          <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
         </div>
         <div className="read-meters">
           <ChapterStat
@@ -948,13 +1053,13 @@ function ReadPool({
             </p>
             <h2>{question.prompt}</h2>
             <ol className="qchoices">
-              {question.choices.map((choice, choiceIndex) => {
+              {answerOrder(question.id, undefined, shuffleAnswers, shuffleSeed).map((choiceIndex, displayIndex) => {
                 const correct = choiceIndex === question.answer;
                 if (hideDistractors && !correct) return null;
                 return (
-                  <li key={choice} className={correct ? "correct" : ""}>
-                    <span>{letters[choiceIndex]}</span>
-                    {choice}
+                  <li key={choiceIndex} className={correct ? "correct" : ""}>
+                    <span>{letters[displayIndex]}</span>
+                    {question.choices[choiceIndex]}
                   </li>
                 );
               })}
@@ -970,12 +1075,18 @@ function ReadPool({
 function Quiz({
   session,
   stats,
+  shuffleAnswers,
+  shuffleSeed,
+  onToggleShuffle,
   onChoose,
   onNext,
   onBack,
 }: {
   session: Session;
   stats: Stats;
+  shuffleAnswers: boolean;
+  shuffleSeed: number;
+  onToggleShuffle: () => void;
   onChoose: (choice: number) => void;
   onNext: () => void;
   onBack?: () => void;
@@ -984,14 +1095,19 @@ function Quiz({
     function onKey(event: KeyboardEvent) {
       if (session.finished) return;
       const target = event.target;
-      if (target instanceof Element && target.closest(".quiz-back")) return;
+      if (target instanceof Element && target.closest(".quiz-back, .shuffle-toggle")) return;
+      const current = session.items[session.index];
       const number = Number(event.key);
-      if (number >= 1 && number <= 4) onChoose(number - 1);
+      if (current && number >= 1 && number <= 4) {
+        const order = answerOrder(current.id, session.orders[current.id], shuffleAnswers, shuffleSeed);
+        const choice = order[number - 1];
+        if (choice !== undefined) onChoose(choice);
+      }
       if (event.key === "Enter") onNext();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onChoose, onNext, session.finished]);
+  }, [onChoose, onNext, session.finished, session.index, session.items, session.orders, shuffleAnswers, shuffleSeed]);
 
   if (session.finished) {
     const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
@@ -1029,7 +1145,8 @@ function Quiz({
                 {!right && (
                   <>
                     <p className="answer-line">
-                      Answer: {letters[item.answer]}. {item.choices[item.answer]}
+                      Answer: {letters[answerOrder(item.id, session.orders[item.id], false, 0).indexOf(item.answer)]}.{" "}
+                      {item.choices[item.answer]}
                     </p>
                     {item.explanation ? <p className="why">{item.explanation}</p> : null}
                   </>
@@ -1075,18 +1192,27 @@ function Quiz({
           </>
         )}
         <h1>{current.prompt}</h1>
+        <div className="quiz-tools">
+          <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
+        </div>
         <div className="choices">
-          {current.choices.map((choice, index) => {
-            const selected = pick === index;
-            const correct = session.revealed && index === current.answer;
-            const incorrect = session.revealed && selected && index !== current.answer;
+          {answerOrder(current.id, session.orders[current.id], shuffleAnswers, shuffleSeed).map((choiceIndex, displayIndex) => {
+            const selected = pick === choiceIndex;
+            const correct = session.revealed && choiceIndex === current.answer;
+            const incorrect = session.revealed && selected && choiceIndex !== current.answer;
             const className = ["choice", selected ? "selected" : "", correct ? "correct" : "", incorrect ? "incorrect" : ""]
               .filter(Boolean)
               .join(" ");
             return (
-              <button key={choice} type="button" className={className} disabled={locked} onClick={() => onChoose(index)}>
-                <span>{letters[index]}</span>
-                {choice}
+              <button
+                key={choiceIndex}
+                type="button"
+                className={className}
+                disabled={locked}
+                onClick={() => onChoose(choiceIndex)}
+              >
+                <span>{letters[displayIndex]}</span>
+                {current.choices[choiceIndex]}
               </button>
             );
           })}
