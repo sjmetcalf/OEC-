@@ -18,6 +18,7 @@ export const chapters: Chapter[] = [
   { id: "9", title: "9. Airway", summary: "Opening and protecting the airway." },
   { id: "10", title: "10. Shock", summary: "Recognizing and treating shock." },
   { id: "11", title: "11. Altered mental status", summary: "Stroke, sugar, seizures, and other causes of a changed mental status." },
+  { id: "12", title: "12. Substances and Medications", summary: "Scene safety, poisonings, and assisting with prescribed medications." },
   { id: "13", title: "13. Respiratory", summary: "Breathing problems and respiratory emergencies." },
   { id: "14", title: "14. Allergies", summary: "Allergic reactions and anaphylaxis." },
   { id: "15", title: "15. Cardiovascular", summary: "Chest pain and other cardiovascular emergencies." },
