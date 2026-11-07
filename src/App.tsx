@@ -347,31 +347,17 @@ export default function App() {
     scrollTop();
   }
 
-  function choose(choice: number) {
-    if (!session || session.finished) return;
-    const current = session.items[session.index];
-    if (!current) return;
-    const drilling = session.mode === "study" || session.mode === "drill";
-    if (drilling && session.revealed) return;
+  function advance(current: Session) {
+    const question = current.items[current.index];
+    if (!question || current.picks[question.id] === undefined) return;
 
-    const firstPick = session.picks[current.id] === undefined;
-    const picks = { ...session.picks, [current.id]: choice };
-    if (drilling && firstPick) remember(current.id, choice === current.answer);
-    setSession({ ...session, picks, revealed: drilling });
-  }
-
-  function next() {
-    if (!session) return;
-    const current = session.items[session.index];
-    if (!current || session.picks[current.id] === undefined) return;
-
-    const last = session.index === session.items.length - 1;
+    const last = current.index === current.items.length - 1;
     scrollTop();
-    if (last && session.mode === "drill") {
+    if (last && current.mode === "drill") {
       if (shuffleAnswers) setShuffleSeed(Math.floor(Math.random() * 0x7fffffff));
       setSession({
-        ...session,
-        items: continueDeck(session.items, current.id),
+        ...current,
+        items: continueDeck(current.items, question.id),
         index: 0,
         picks: {},
         orders: {},
@@ -381,12 +367,12 @@ export default function App() {
       return;
     }
     if (last) {
-      if (session.mode === "exam") {
-        const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
-        rememberMany(session.items.map((item) => [item.id, session.picks[item.id] === item.answer]));
+      if (current.mode === "exam") {
+        const correct = current.items.filter((item) => current.picks[item.id] === item.answer).length;
+        rememberMany(current.items.map((item) => [item.id, current.picks[item.id] === item.answer]));
         void track("exam_finish");
         const owner = userIdRef.current;
-        void recordPracticeTest({ length: session.items.length, correct }, owner)
+        void recordPracticeTest({ length: current.items.length, correct }, owner)
           .then((rows) => {
             if (userIdRef.current === owner) {
               setTests(rows);
@@ -398,11 +384,44 @@ export default function App() {
             setSyncError(syncFailureMessage(error));
           });
       }
-      setSession({ ...session, finished: true, revealed: true });
+      setSession({ ...current, finished: true, revealed: true });
       return;
     }
 
-    setSession({ ...session, index: session.index + 1, revealed: false });
+    setSession({ ...current, index: current.index + 1, revealed: false });
+  }
+
+  function choose(choice: number, fromKey = false) {
+    if (!session || session.finished) return;
+    const question = session.items[session.index];
+    if (!question) return;
+    const showsAnswer = session.mode === "study" || session.mode === "drill";
+
+    if (showsAnswer) {
+      const currentPick = session.picks[question.id];
+      if (session.revealed && currentPick === choice) {
+        if (!fromKey) advance(session);
+        return;
+      }
+      const firstPick = currentPick === undefined;
+      const picks = { ...session.picks, [question.id]: choice };
+      if (firstPick) remember(question.id, choice === question.answer);
+      setSession({ ...session, picks, revealed: true });
+      return;
+    }
+
+    advance({ ...session, picks: { ...session.picks, [question.id]: choice }, revealed: false });
+  }
+
+  function next() {
+    if (!session) return;
+    advance(session);
+  }
+
+  function previous() {
+    if (!session || session.finished || session.mode !== "exam" || session.index === 0) return;
+    scrollTop();
+    setSession({ ...session, index: session.index - 1, revealed: false });
   }
 
   useEffect(() => {
@@ -526,6 +545,7 @@ export default function App() {
             onToggleShuffle={toggleShuffleAnswers}
             onChoose={choose}
             onNext={next}
+            onPrevious={session.mode === "exam" ? previous : undefined}
             onBack={
               session.fromChapter
                 ? backToChapter
@@ -754,6 +774,40 @@ function useModeGlow(rootRef: { current: HTMLDivElement | null }) {
   }, [rootRef]);
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function ChapterMeter({ percent }: { percent: number }) {
+  const [width, setWidth] = useState(() =>
+    typeof window !== "undefined" && prefersReducedMotion() ? percent : 0,
+  );
+
+  useEffect(() => {
+    if (prefersReducedMotion() || percent === 0) {
+      setWidth(percent);
+      return;
+    }
+    const duration = 900;
+    const start = performance.now();
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min(1, Math.max(0, (now - start) / duration));
+      const eased = 1 - (1 - progress) ** 3;
+      setWidth(percent * eased);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [percent]);
+
+  return (
+    <span className="meter" aria-hidden="true">
+      <span style={{ width: `${width}%`, transition: "none" }} />
+    </span>
+  );
+}
+
 function Home({
   stats,
   onStudy,
@@ -859,9 +913,7 @@ function Home({
                   <span className="chapter-row-num">{number}</span>
                   <span className="chapter-row-label">{name}</span>
                 </span>
-                <span className="meter" aria-hidden="true">
-                  <span style={{ width: `${width}%` }} />
-                </span>
+                <ChapterMeter percent={width} />
                 <span className="chapter-row-count">
                   <CountUp to={seen} />/<CountUp to={pool.length} />
                 </span>
@@ -1240,6 +1292,7 @@ function Quiz({
   onToggleShuffle,
   onChoose,
   onNext,
+  onPrevious,
   onBack,
 }: {
   session: Session;
@@ -1247,27 +1300,34 @@ function Quiz({
   shuffleAnswers: boolean;
   shuffleSeed: number;
   onToggleShuffle: () => void;
-  onChoose: (choice: number) => void;
+  onChoose: (choice: number, fromKey?: boolean) => void;
   onNext: () => void;
+  onPrevious?: () => void;
   onBack?: () => void;
 }) {
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (session.finished) return;
+      if (session.finished || event.metaKey || event.ctrlKey || event.altKey) return;
       const target = event.target;
       if (target instanceof Element && target.closest(".quiz-back, .shuffle-switch")) return;
       const current = session.items[session.index];
+      if (event.key === "Enter") {
+        if (target instanceof Element && target.closest(".quiz-prev")) return;
+        if (!current || session.picks[current.id] === undefined) return;
+        event.preventDefault();
+        onNext();
+        return;
+      }
       const number = Number(event.key);
-      if (current && number >= 1 && number <= 4) {
+      if (current && number >= 1 && number <= 4 && !event.repeat) {
         const order = answerOrder(current.id, session.orders[current.id], shuffleAnswers, shuffleSeed);
         const choice = order[number - 1];
-        if (choice !== undefined) onChoose(choice);
+        if (choice !== undefined) onChoose(choice, true);
       }
-      if (event.key === "Enter") onNext();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onChoose, onNext, session.finished, session.index, session.items, session.orders, shuffleAnswers, shuffleSeed]);
+  }, [onChoose, onNext, session.finished, session.index, session.items, session.orders, session.picks, shuffleAnswers, shuffleSeed]);
 
   if (session.finished) {
     const correct = session.items.filter((item) => session.picks[item.id] === item.answer).length;
@@ -1325,10 +1385,15 @@ function Quiz({
   const pick = session.picks[current.id];
   const chapter = chapterById(current.chapter);
   const drilling = session.mode === "drill";
-  const locked = (session.mode === "study" || drilling) && session.revealed;
+  const showPrevious = Boolean(onPrevious) && session.index > 0;
   const label = drilling
     ? session.title
     : `${session.mode === "exam" ? "Practice test" : session.title === "All questions" ? session.title : "Study"} · ${chapter?.title}`;
+  const hint =
+    session.mode === "exam"
+      ? "Press 1–4 to answer and move on."
+      : "Press 1–4 to answer. Tap the choice again, or press Enter, to move on.";
+  const footClass = ["quiz-foot", drilling ? "drill-foot" : "", showPrevious ? "has-prev" : ""].filter(Boolean).join(" ");
 
   return (
     <section className="quiz">
@@ -1366,26 +1431,20 @@ function Quiz({
                 selected={selected}
                 correct={correct}
                 incorrect={incorrect}
-                disabled={locked}
                 onChoose={() => onChoose(choiceIndex)}
               />
             );
           })}
         </div>
         {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
-        <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
-          {drilling ? (
-            <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p>
-          ) : (
-            <p className="quiz-hint">
-              {session.mode === "exam"
-                ? "Answers stay hidden until the end. Press 1–4, then Enter."
-                : "Press 1–4 to answer. Enter for the next question."}
-            </p>
-          )}
-          <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
-            {drilling || session.index !== session.items.length - 1 ? "Next" : "See results"}
-          </button>
+        <div className={footClass}>
+          {drilling ? <p className="attempt-tally">{attemptTally(stats.results[current.id])}</p> : null}
+          <p className="quiz-hint">{hint}</p>
+          {showPrevious && onPrevious ? (
+            <button type="button" className="quiz-prev" onClick={onPrevious}>
+              Previous
+            </button>
+          ) : null}
         </div>
       </article>
     </section>
