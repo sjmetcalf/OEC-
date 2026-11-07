@@ -757,8 +757,11 @@ function Home({
 
 function ShuffleToggle({ pressed, onClick }: { pressed: boolean; onClick: () => void }) {
   return (
-    <button type="button" className="ghost shuffle-toggle" aria-pressed={pressed} onClick={onClick}>
-      {pressed ? "Answers shuffled" : "Shuffle answers"}
+    <button type="button" className="shuffle-switch" role="switch" aria-checked={pressed} onClick={onClick}>
+      <span className="shuffle-switch-label">Shuffle answers</span>
+      <span className="shuffle-switch-track" aria-hidden="true">
+        <span className="shuffle-switch-thumb" />
+      </span>
     </button>
   );
 }
@@ -815,6 +818,7 @@ function ExamLength({
     <>
       <div className="drill-meta">
         <BackButton onClick={onBack} />
+        <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
       </div>
       <section className="exam-setup">
       <header className="pool-intro">
@@ -890,7 +894,6 @@ function ExamLength({
           </div>
         </div>
       </details>
-      <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
       <button
         type="button"
         className="primary exam-start"
@@ -1017,6 +1020,7 @@ function ReadPool({
       </div>
       <div className="drill-meta">
         <BackButton onClick={onBack} />
+        <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
       </div>
       <header className="pool-intro">
         <h1>{chapter.title}</h1>
@@ -1030,7 +1034,6 @@ function ReadPool({
           <button type="button" className="ghost" aria-pressed={hideDistractors} onClick={onToggleDistractors}>
             {hideDistractors ? "Show choices" : "Hide distractors"}
           </button>
-          <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
         </div>
         <div className="read-meters">
           <ChapterStat
@@ -1095,7 +1098,7 @@ function Quiz({
     function onKey(event: KeyboardEvent) {
       if (session.finished) return;
       const target = event.target;
-      if (target instanceof Element && target.closest(".quiz-back, .shuffle-toggle")) return;
+      if (target instanceof Element && target.closest(".quiz-back, .shuffle-switch")) return;
       const current = session.items[session.index];
       const number = Number(event.key);
       if (current && number >= 1 && number <= 4) {
@@ -1175,6 +1178,7 @@ function Quiz({
       {onBack ? (
         <div className="drill-meta">
           <BackButton onClick={onBack} />
+          <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
         </div>
       ) : null}
       <article key={current.id} className="qcard">
@@ -1192,9 +1196,6 @@ function Quiz({
           </>
         )}
         <h1>{current.prompt}</h1>
-        <div className="quiz-tools">
-          <ShuffleToggle pressed={shuffleAnswers} onClick={onToggleShuffle} />
-        </div>
         <div className="choices">
           {answerOrder(current.id, session.orders[current.id], shuffleAnswers, shuffleSeed).map((choiceIndex, displayIndex) => {
             const selected = pick === choiceIndex;

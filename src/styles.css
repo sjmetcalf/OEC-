@@ -842,8 +842,64 @@ button:focus-visible {
 .drill-meta {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin: 0 0 0.75rem;
   min-width: 0;
+}
+
+.shuffle-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shuffle-switch:focus {
+  outline: none;
+}
+
+.shuffle-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.shuffle-switch-track {
+  position: relative;
+  width: 2.35rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  background: #d9d6e0;
+}
+
+.shuffle-switch-thumb {
+  position: absolute;
+  top: 0.15rem;
+  left: 0.15rem;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(61, 42, 92, 0.22);
+}
+
+.shuffle-switch[aria-checked="true"] .shuffle-switch-track {
+  background: var(--ink);
+}
+
+.shuffle-switch[aria-checked="true"] .shuffle-switch-thumb {
+  transform: translateX(0.95rem);
 }
 
 .quiz-back {
@@ -929,6 +985,11 @@ button:focus-visible {
   font-size: 1rem;
   line-height: 1.45;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.choice:focus {
+  outline: none;
 }
 
 .choice span {
@@ -944,8 +1005,15 @@ button:focus-visible {
   font-weight: 700;
 }
 
-.choice:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+@media (hover: hover) and (pointer: fine) {
+  .choice:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  }
+
+  .choice:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 .choice.selected {
@@ -1543,18 +1611,6 @@ button:focus-visible {
   color: var(--ink);
 }
 
-.quiz-tools {
-  display: flex;
-  flex-wrap: wrap;
-  margin: 0.15rem 0 0.85rem;
-}
-
-.ghost.shuffle-toggle[aria-pressed="true"] {
-  border-color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 6%, var(--white));
-  color: var(--ink);
-}
-
 .exam-start {
   justify-self: start;
   width: auto;
@@ -1821,6 +1877,7 @@ button:focus-visible {
   border-radius: var(--radius);
   font-size: 1rem;
   line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .qchoices li span {
@@ -1991,6 +2048,13 @@ button:focus-visible {
 
   .account-dialog {
     animation: dialog-in 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .shuffle-switch-track,
+  .shuffle-switch-thumb {
+    transition:
+      transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+      background 0.15s ease;
   }
 
   .meter span,
