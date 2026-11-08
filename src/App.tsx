@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
 import { ThemeControl } from "./theme.tsx";
@@ -39,7 +39,7 @@ import {
   trackVisit,
   visitorId,
 } from "./analytics.ts";
-import { loadLeaderboard, loadProfile, saveProfile, type BoardRow, type Profile } from "./profile.ts";
+import { formatBoardDate, loadLeaderboard, loadProfile, saveProfile, type BoardRow, type Profile } from "./profile.ts";
 import { supabase } from "./supabase.ts";
 
 type Mode = "study" | "exam" | "drill";
@@ -634,18 +634,23 @@ type InstallPrompt = Event & {
 };
 
 function OfflineInstall() {
+  const installTitleId = useId();
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
   const [saved, setSaved] = useState(false);
   const [hidden, setHidden] = useState(true);
   const [ios, setIos] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const installed =
       window.matchMedia("(display-mode: standalone)").matches ||
       ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     if (!import.meta.env.PROD || installed || !("serviceWorker" in navigator)) return;
+    const agent = navigator.userAgent;
     setHidden(false);
-    setIos(/iphone|ipad|ipod/i.test(navigator.userAgent));
+    setIos(/iphone|ipad|ipod/i.test(agent));
+    setMobile(/iphone|ipad|ipod|android/i.test(agent));
 
     let cancel = false;
     function onPrompt(event: Event) {
@@ -662,6 +667,15 @@ function OfflineInstall() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!guideOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setGuideOpen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [guideOpen]);
+
   if (hidden) return null;
 
   async function install() {
@@ -670,17 +684,43 @@ function OfflineInstall() {
     setPrompt(null);
   }
 
+  const steps = ios
+    ? ["Tap the Share button in Safari.", "Tap Add to Home Screen.", "Tap Add."]
+    : ["Open the browser menu.", "Tap Install app or Add to Home screen.", "Confirm to add oec.fyi."];
+
   return (
-    <p className="offline-note">
-      <span>{saved ? "Questions are saved on this device." : "Saving the questions on this device."}</span>
-      {prompt ? (
-        <button type="button" className="offline-install" onClick={() => void install()}>
-          Install
-        </button>
-      ) : ios ? (
-        <span>Add to Home Screen to open it like an app.</span>
+    <>
+      <p className="offline-note">
+        <span>{saved ? "Questions are saved on this device." : "Saving the questions on this device."}</span>
+        {prompt ? (
+          <button type="button" className="offline-install" onClick={() => void install()}>
+            Install
+          </button>
+        ) : mobile ? (
+          <button type="button" className="offline-install" onClick={() => setGuideOpen(true)}>
+            Add to Home Screen to open it like an app.
+          </button>
+        ) : null}
+      </p>
+      {guideOpen ? (
+        <div className="account-layer">
+          <button className="account-backdrop" type="button" aria-label="Close install steps" onClick={() => setGuideOpen(false)} />
+          <div className="account-dialog install-dialog" role="dialog" aria-modal="true" aria-labelledby={installTitleId}>
+            <button className="account-close" type="button" aria-label="Close" onClick={() => setGuideOpen(false)}>
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              </svg>
+            </button>
+            <h2 id={installTitleId}>Add to Home Screen</h2>
+            <ol>
+              {steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          </div>
+        </div>
       ) : null}
-    </p>
+    </>
   );
 }
 
@@ -811,6 +851,7 @@ function ChapterMeter({ percent }: { percent: number }) {
 function HomeBoard({ signedIn }: { signedIn: boolean }) {
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  const listRef = useRef<HTMLOListElement>(null);
 
   useEffect(() => {
     let current = true;
@@ -823,6 +864,32 @@ function HomeBoard({ signedIn }: { signedIn: boolean }) {
       current = false;
     };
   }, []);
+
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      for (const name of list.querySelectorAll(".board-name.has-crown")) {
+        const person = name.querySelector(".board-person");
+        const crown = name.querySelector(".board-crown");
+        if (person instanceof HTMLElement && crown instanceof SVGElement) {
+          const height = person.offsetHeight;
+          if (height > 0) crown.style.height = `${height}px`;
+        }
+      }
+      const items = [...list.querySelectorAll("li")].slice(0, 10);
+      if (items.length === 0) return;
+      const row = Math.max(...items.map((item) => item.getBoundingClientRect().height));
+      const gap = Number.parseFloat(getComputedStyle(list).rowGap) || 0;
+      if (row <= 0) return;
+      list.style.setProperty("--board-row", `${Math.ceil(row)}px`);
+      list.style.setProperty("--board-gap", `${Math.ceil(gap)}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    for (const item of [...list.querySelectorAll("li")].slice(0, 10)) observer.observe(item);
+    return () => observer.disconnect();
+  }, [rows]);
 
   const listed = rows?.some((row) => row.isSelf) ?? false;
   return (
@@ -837,17 +904,34 @@ function HomeBoard({ signedIn }: { signedIn: boolean }) {
         <p className="board-status">The board is open. A finished practice test can claim the first place.</p>
       ) : (
         <>
-          <ol className="board-list">
-            {rows.map((row) => (
+          <ol className="board-list" ref={listRef} tabIndex={rows.length > 10 ? 0 : undefined}>
+            {rows.map((row) => {
+              const takenLabel = row.takenAt ? formatBoardDate(row.takenAt) : null;
+              return (
               <li key={`${row.rank}-${row.displayName}`} className={row.isSelf ? "is-self" : undefined}>
                 <span className="board-rank">{row.rank}</span>
-                <span className="board-name">{row.displayName}</span>
+                <span className={row.rank === 1 ? "board-name has-crown" : "board-name"}>
+                  {row.rank === 1 ? (
+                    <svg className="board-crown" viewBox="2 3.2 28 19.4" aria-hidden="true">
+                      <path
+                        fill="currentColor"
+                        fillRule="evenodd"
+                        d="M2 22.6 6.2 8.6 10.6 13.2 16 3.2 21.4 13.2l4.4-4.6L30 22.6H2Zm14-12.2 4.2 4.2L16 18.8l-4.2-4.2L16 10.4Z"
+                      />
+                    </svg>
+                  ) : null}
+                  <span className="board-person">
+                    <span className="board-person-name">{row.displayName}</span>
+                    {takenLabel ? <span className="board-person-date">{takenLabel}</span> : null}
+                  </span>
+                </span>
                 <span className="board-score">
                   <strong>{row.percent}%</strong>
                   <span>{row.length} questions</span>
                 </span>
               </li>
-            ))}
+              );
+            })}
           </ol>
           {signedIn && !listed ? <p className="board-status">Save a display name to add your best test.</p> : null}
         </>
@@ -912,7 +996,14 @@ function Home({
           <BlurText text="Practice" />
         </h1>
         <p className="lede">
-          <CountUp to={questions.length} /> questions across the OEC chapters.
+          <span>
+            <CountUp to={questions.length} /> questions across the OEC chapters.
+          </span>
+          {missed.length > 0 ? (
+            <button type="button" className="primary" onClick={onRetry}>
+              Study {missed.length} missed
+            </button>
+          ) : null}
         </p>
         <OfflineInstall />
       </header>
@@ -935,14 +1026,6 @@ function Home({
           <span>Mixed questions. Answers stay hidden until the end.</span>
         </button>
       </div>
-      {missed.length > 0 && (
-        <button type="button" className="review-banner" onClick={onRetry}>
-          <span>
-            Study {missed.length} missed {missed.length === 1 ? "question" : "questions"}
-          </span>
-          <strong>Start</strong>
-        </button>
-      )}
       <HomeBoard signedIn={signedIn} />
       <section className="progress-panel" aria-label="Chapters">
         <div className="section-head">

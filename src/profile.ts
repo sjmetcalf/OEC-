@@ -10,8 +10,19 @@ export type BoardRow = {
   displayName: string;
   percent: number;
   length: number;
+  takenAt: string | null;
   isSelf: boolean;
 };
+
+export function formatBoardDate(value: string): string | null {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
 
 const namePattern = /^[A-Za-z0-9][A-Za-z0-9 ._-]*[A-Za-z0-9]$/;
 
@@ -104,17 +115,21 @@ export async function loadLeaderboard(): Promise<{ rows: BoardRow[]; error: stri
   if (!Array.isArray(data)) return { rows: [], error: null };
   const rows = data.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
-    const row = item as Partial<Record<"rank" | "display_name" | "percent" | "length" | "is_self", unknown>>;
+    const row = item as Partial<
+      Record<"rank" | "display_name" | "percent" | "length" | "taken_at" | "is_self", unknown>
+    >;
     const rank = asNumber(row.rank);
     const percent = asNumber(row.percent);
     const length = asNumber(row.length);
     if (rank === null || percent === null || length === null || typeof row.display_name !== "string") return [];
+    const takenAt = typeof row.taken_at === "string" ? row.taken_at : null;
     return [
       {
         rank,
         displayName: row.display_name,
         percent,
         length,
+        takenAt,
         isSelf: row.is_self === true,
       },
     ];

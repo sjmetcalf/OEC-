@@ -485,6 +485,26 @@ h3 {
   color: var(--accent-hover);
 }
 
+.install-dialog {
+  justify-items: stretch;
+  padding-top: 1.35rem;
+  text-align: left;
+}
+
+.install-dialog h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.install-dialog ol {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.15rem;
+  line-height: 1.45;
+}
+
 .account-page {
   display: grid;
   gap: 1.35rem;
@@ -950,10 +970,39 @@ h3 {
 }
 
 .board-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.board-person {
+  display: grid;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.board-person-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.2;
+}
+
+.board-person-date {
+  color: var(--ink-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.board-crown {
+  flex: 0 0 auto;
+  width: auto;
+  height: 2.15rem;
+  aspect-ratio: 28 / 19.4;
+  color: #f5b400;
 }
 
 .board-score {
@@ -1087,39 +1136,6 @@ button:focus-visible {
   font-size: 1.35rem;
   font-weight: 650;
   letter-spacing: -0.03em;
-}
-
-.review-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  margin-top: 0;
-  padding: 0.7rem 0.7rem 0.7rem 1.15rem;
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  background: var(--card-glass);
-  box-shadow: var(--shadow-card);
-  font-size: 0.9375rem;
-  font-weight: 500;
-  letter-spacing: -0.011em;
-  text-align: left;
-  cursor: pointer;
-}
-
-.review-banner strong {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.15rem;
-  padding: 0 0.95rem;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--on-primary);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .topics {
@@ -1428,8 +1444,7 @@ button.choice {
     box-shadow: var(--shadow-hover);
   }
 
-  .mode:hover,
-  .review-banner:hover {
+  .mode:hover {
     border-color: var(--hover-border);
     box-shadow: var(--shadow-hover-card);
   }
@@ -1437,10 +1452,6 @@ button.choice {
   .chapter-row:hover,
   .exam-chapter:hover {
     background: var(--hover-wash);
-  }
-
-  .review-banner:hover strong {
-    background: var(--primary-hover);
   }
 
   .choice:focus-visible {
@@ -1593,7 +1604,19 @@ button.choice {
 }
 
 .pool-intro .lede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  max-width: none;
   line-height: 1.35;
+}
+
+.pool-intro .lede .primary {
+  flex: 0 0 auto;
+  min-height: 2.15rem;
+  padding: 0.35rem 0.9rem;
+  white-space: nowrap;
 }
 
 .pool-intro h1 {
@@ -2217,6 +2240,16 @@ button.choice {
   box-shadow: var(--shadow-card);
 }
 
+.home-board .board-list {
+  --board-row: 2.75rem;
+  --board-gap: 0.4rem;
+  max-height: calc(10 * var(--board-row) + 9 * var(--board-gap));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: auto;
+}
+
 .home-board .section-head {
   flex-direction: column;
   align-items: flex-start;
@@ -2507,6 +2540,10 @@ button.choice {
     width: 100%;
   }
 
+  .pool-intro .lede .primary {
+    min-height: 2.75rem;
+  }
+
   .section-head {
     align-items: start;
     gap: 0.2rem;
@@ -2564,7 +2601,6 @@ button.choice {
   .primary,
   .ghost,
   .mode,
-  .review-banner,
   .chapter-row,
   .choice,
   .exam-tool,
@@ -2585,7 +2621,6 @@ button.choice {
   .account-close:active,
   .read-tabs button:active,
   .mode:active,
-  .review-banner:active,
   .chapter-row:active,
   .exam-chapter:active,
   .exam-tool:active,
