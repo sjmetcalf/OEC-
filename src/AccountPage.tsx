@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { BackButton } from "./BackButton.tsx";
 import { CountUp } from "./bits.tsx";
 import { CometDial } from "./comet-dial.tsx";
 import { scorePercent, type PracticeTest } from "./exams.ts";
 import { MagicBento } from "./magic-bento.tsx";
+import { cleanDisplayName, displayNameError, type Profile } from "./profile.ts";
 import type { StudyCoverage } from "./progress.ts";
 
 const examLine = 80;
@@ -64,6 +65,8 @@ function ScoreChart({ tests }: { tests: PracticeTest[] }) {
 
 export default function AccountPage({
   email,
+  profile,
+  onSaveProfile,
   tests,
   aptitude,
   coverage,
@@ -75,6 +78,8 @@ export default function AccountPage({
   onSignOut,
 }: {
   email: string;
+  profile: Profile | null;
+  onSaveProfile: (input: { displayName: string }) => Promise<string | null>;
   tests: PracticeTest[];
   aptitude: number;
   coverage: StudyCoverage;
@@ -85,6 +90,46 @@ export default function AccountPage({
   onStudyChapter: (chapterId: string) => void;
   onSignOut: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(profile?.displayName ?? "");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
+  const savedName = profile?.displayName ?? "";
+  const nameRule = "Use 2–24 letters, numbers, spaces, periods, hyphens, or underscores.";
+
+  function beginEdit() {
+    setDraft(savedName);
+    setNameError(null);
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setDraft(savedName);
+    setNameError(null);
+    setEditing(false);
+  }
+
+  async function saveName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (savingName || busy) return;
+    const displayName = cleanDisplayName(draft);
+    setDraft(displayName);
+    const format = displayName ? displayNameError(displayName) : nameRule;
+    if (format) {
+      setNameError(format);
+      return;
+    }
+    setSavingName(true);
+    setNameError(null);
+    const error = await onSaveProfile({ displayName });
+    setSavingName(false);
+    if (error) {
+      setNameError(error);
+      return;
+    }
+    setEditing(false);
+  }
+
   const percents = tests.map(scorePercent);
   const recent = percents.at(-1);
   const best = percents.length > 0 ? Math.max(...percents) : null;
@@ -224,8 +269,54 @@ export default function AccountPage({
       </div>
       <header className="pool-intro">
         <p className="section-label">Account</p>
-        <h1>Your practice</h1>
+        {editing ? (
+          <form className="account-alias" onSubmit={(event) => void saveName(event)}>
+            <input
+              className="account-alias-input"
+              value={draft}
+              size={Math.min(24, Math.max(draft.length + 1, 8))}
+              maxLength={24}
+              autoFocus
+              autoComplete="nickname"
+              spellCheck={false}
+              aria-label="Display name"
+              aria-invalid={nameError ? true : undefined}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                setNameError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  cancelEdit();
+                }
+              }}
+            />
+            <button className="text-button" type="button" onClick={cancelEdit}>
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <div className="account-alias">
+            <h1>{savedName || "Your practice"}</h1>
+            {savedName ? (
+              <button className="text-button" type="button" onClick={beginEdit}>
+                Edit
+              </button>
+            ) : null}
+          </div>
+        )}
+        {nameError ? (
+          <p className="account-error" role="alert">
+            {nameError}
+          </p>
+        ) : null}
         <p className="lede">{email}</p>
+        {!savedName && !editing ? (
+          <button className="text-button" type="button" onClick={beginEdit}>
+            Add a name
+          </button>
+        ) : null}
         {deviceNote ? <p className="account-local">{deviceNote}</p> : null}
       </header>
       <MagicBento

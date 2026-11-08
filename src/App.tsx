@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
 import { ThemeControl } from "./theme.tsx";
@@ -39,6 +39,7 @@ import {
   trackVisit,
   visitorId,
 } from "./analytics.ts";
+import { loadLeaderboard, loadProfile, saveProfile, type BoardRow, type Profile } from "./profile.ts";
 import { supabase } from "./supabase.ts";
 
 type Mode = "study" | "exam" | "drill";
@@ -95,7 +96,7 @@ function answerOrder(questionId: string, saved: ChoiceOrder | undefined, shuffle
   if (saved) return saved;
   return shuffleAnswers ? shuffledOrder(questionId, seed) : straightOrder;
 }
-const examLengths = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+const examLengths = [25, 50, 100] as const;
 type ExamLength = (typeof examLengths)[number];
 
 function examLength(count: number): ExamLength | undefined {
@@ -136,6 +137,7 @@ export default function App() {
   const [shuffleAnswers, setShuffleAnswers] = useState(readShuffleAnswers);
   const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 0x7fffffff));
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [tests, setTests] = useState<PracticeTest[]>([]);
   const [accountOpen, setAccountOpen] = useState(false);
   const [leaveTo, setLeaveTo] = useState<"home" | "setup" | null>(null);
@@ -165,9 +167,18 @@ export default function App() {
         if (!nextUser) {
           setStats(loadStats());
           setTests(loadPracticeTests(null));
+          setProfile(null);
           setDeviceNote(null);
           return;
         }
+        void loadProfile(nextUser.id)
+          .then((nextProfile) => {
+            if (userIdRef.current === nextUser.id) setProfile(nextProfile);
+          })
+          .catch((error: unknown) => {
+            if (userIdRef.current === nextUser.id) setProfile(null);
+            setSyncError(syncFailureMessage(error));
+          });
         void linkVisitor();
         void syncPracticeTests(nextUser.id).then((rows) => {
           if (userIdRef.current === nextUser.id) {
@@ -489,6 +500,14 @@ export default function App() {
         {accountOpen && userEmail ? (
           <AccountPage
             email={userEmail}
+            profile={profile}
+            onSaveProfile={async (input) => {
+              const owner = userIdRef.current;
+              if (!owner) return "The name did not save. Try again.";
+              const result = await saveProfile(owner, input);
+              if (userIdRef.current === owner && result.profile) setProfile(result.profile);
+              return result.error;
+            }}
             tests={tests}
             aptitude={
               chapterMeters(
@@ -565,6 +584,7 @@ export default function App() {
         ) : (
           <Home
             stats={stats}
+            signedIn={userEmail !== null}
             onStudy={() => start("study", questions, "All questions")}
             onRead={() => setReading(chapters[0]?.id ?? "1")}
             onExam={() => {
@@ -788,8 +808,57 @@ function ChapterMeter({ percent }: { percent: number }) {
   );
 }
 
+function HomeBoard({ signedIn }: { signedIn: boolean }) {
+  const [rows, setRows] = useState<BoardRow[] | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    void loadLeaderboard().then((result) => {
+      if (!current) return;
+      setRows(result.rows);
+      setUnavailable(result.error !== null);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  const listed = rows?.some((row) => row.isSelf) ?? false;
+  return (
+    <section className="home-board" aria-label="Leaderboard">
+      <div className="section-head">
+        <h2>Leaderboard</h2>
+        <p>Best practice test.</p>
+      </div>
+      {rows === null ? (
+        <p className="board-status">Loading the board.</p>
+      ) : unavailable || rows.length === 0 ? (
+        <p className="board-status">The board is open. A finished practice test can claim the first place.</p>
+      ) : (
+        <>
+          <ol className="board-list">
+            {rows.map((row) => (
+              <li key={`${row.rank}-${row.displayName}`} className={row.isSelf ? "is-self" : undefined}>
+                <span className="board-rank">{row.rank}</span>
+                <span className="board-name">{row.displayName}</span>
+                <span className="board-score">
+                  <strong>{row.percent}%</strong>
+                  <span>{row.length} questions</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          {signedIn && !listed ? <p className="board-status">Save a display name to add your best test.</p> : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 function Home({
   stats,
+  signedIn,
   onStudy,
   onRead,
   onExam,
@@ -798,6 +867,7 @@ function Home({
   syncError,
 }: {
   stats: Stats;
+  signedIn: boolean;
   onStudy: () => void;
   onRead: () => void;
   onExam: () => void;
@@ -873,6 +943,7 @@ function Home({
           <strong>Start</strong>
         </button>
       )}
+      <HomeBoard signedIn={signedIn} />
       <section className="progress-panel" aria-label="Chapters">
         <div className="section-head">
           <h2>Chapters</h2>
@@ -929,24 +1000,13 @@ function ExamLength({
   onToggleShuffle: () => void;
 }) {
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set(chapters.map((chapter) => chapter.id)));
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState<ExamLength>(50);
   const poolSize = chapters.reduce(
     (total, chapter) => (selected.has(chapter.id) ? total + questionsIn(chapter.id).length : total),
     0,
   );
-  const cap = poolSize >= 10 ? Math.min(100, Math.floor(poolSize / 10) * 10) : 0;
-  const shown = cap === 0 ? 0 : Math.min(Math.max(10, count), cap);
-  const sliderValue = shown === 0 ? 10 : shown;
-  const fill = shown < 10 ? 0 : cap <= 10 ? 100 : ((shown - 10) / (cap - 10)) * 100;
-  const questionWord = shown === 1 ? "question" : "questions";
-
-  useEffect(() => {
-    setCount((current) => {
-      if (cap < 10) return current;
-      const next = Math.min(cap, Math.max(10, Math.round(current / 10) * 10));
-      return next === current ? current : next;
-    });
-  }, [cap]);
+  const available = examLengths.filter((length) => poolSize >= length);
+  const shown = available.includes(count) ? count : available.at(-1);
 
   function toggleChapter(id: string) {
     setSelected((current) => {
@@ -979,27 +1039,24 @@ function ExamLength({
       </header>
       <div className="exam-range">
         <p className="exam-count">
-          <strong>{shown}</strong>
-          <span>{questionWord}</span>
+          <strong>{shown ?? "—"}</strong>
+          <span>questions</span>
         </p>
-        <input
-          id="practice-length"
-          className="exam-slider"
-          type="range"
-          min={10}
-          max={cap < 10 ? 10 : cap}
-          step={10}
-          value={sliderValue}
-          disabled={cap < 10}
-          aria-label="Number of questions"
-          aria-valuetext={`${shown} ${questionWord}`}
-          style={{ "--fill": `${fill}%` } as CSSProperties}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (!Number.isFinite(next)) return;
-            setCount(Math.min(Math.max(10, next), cap));
-          }}
-        />
+        <div className="exam-lengths" role="group" aria-label="Number of questions">
+          {examLengths.map((length) => (
+            <button
+              key={length}
+              type="button"
+              className={length === shown ? "exam-length is-selected" : "exam-length"}
+              aria-pressed={length === shown}
+              disabled={poolSize < length}
+              onClick={() => setCount(length)}
+            >
+              {length}
+            </button>
+          ))}
+        </div>
+        {shown === undefined ? <p className="exam-length-note">Select more chapters to reach 25 questions.</p> : null}
       </div>
       <details className="exam-chapters-disclosure">
         <summary className="exam-chapters-summary" id={selectedCount === 0 ? "exam-chapter-hint" : undefined}>
@@ -1048,11 +1105,11 @@ function ExamLength({
       <button
         type="button"
         className="primary exam-start"
-        disabled={selectedCount === 0 || shown < 10}
+        disabled={selectedCount === 0 || shown === undefined}
         aria-describedby={selectedCount === 0 ? "exam-chapter-hint" : undefined}
         onClick={() => {
           const chapterIds = chapters.map((chapter) => chapter.id).filter((id) => selected.has(id));
-          onExam(shown, chapterIds);
+          if (shown !== undefined) onExam(shown, chapterIds);
         }}
       >
         Start practice test
