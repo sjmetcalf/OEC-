@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { BackButton } from "./BackButton.tsx";
+import { Threads } from "./threads.tsx";
 import { CountUp } from "./bits.tsx";
 import { CometDial } from "./comet-dial.tsx";
 import { scorePercent, type PracticeTest } from "./exams.ts";
@@ -264,6 +265,26 @@ export default function AccountPage({
 
   return (
     <section className="account-page">
+      <div className="snowfield" aria-hidden="true">
+        <Threads
+          color="#a855f7"
+          midColor="#e879f9"
+          accentColor="#fb7185"
+          distance={1.4}
+          split={0.18}
+          waves={2.4}
+          thickness={0.8}
+          softness={0}
+          amplitude={0.8}
+          speed={0.2}
+          lineCount={77}
+          taper={0.55}
+          brightness={2}
+          fadeLeft={0.46}
+          opacity={0.68}
+          enableMouseInteraction
+        />
+      </div>
       <div className="drill-meta">
         <BackButton onClick={onBack} />
       </div>

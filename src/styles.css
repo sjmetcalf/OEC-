@@ -486,9 +486,17 @@ h3 {
 }
 
 .account-page {
+  position: relative;
+  isolation: isolate;
   display: grid;
   gap: 1.35rem;
   min-width: 0;
+}
+
+.account-page .snowfield {
+  height: 16rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 48%, transparent 100%);
 }
 
 .account-page > .drill-meta {
