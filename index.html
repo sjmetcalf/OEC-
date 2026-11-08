@@ -16,19 +16,17 @@
     <link rel="icon" href="/favicon.svg" />
     <script>
       (function () {
-        var choice = "system";
+        var choice = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         try {
           var stored = localStorage.getItem("oec-theme");
-          if (stored === "light" || stored === "dark" || stored === "system") choice = stored;
+          if (stored === "light" || stored === "dark") choice = stored;
+          else localStorage.setItem("oec-theme", choice);
         } catch (e) {}
-        var dark =
-          choice === "dark" ||
-          (choice !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         var root = document.documentElement;
-        root.setAttribute("data-theme", dark ? "dark" : "light");
-        root.style.colorScheme = dark ? "dark" : "light";
+        root.setAttribute("data-theme", choice);
+        root.style.colorScheme = choice;
         var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute("content", dark ? "#16121f" : "#a855f7");
+        if (meta) meta.setAttribute("content", choice === "dark" ? "#16121f" : "#a855f7");
       })();
     </script>
   </head>

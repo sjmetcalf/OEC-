@@ -634,93 +634,35 @@ type InstallPrompt = Event & {
 };
 
 function OfflineInstall() {
-  const installTitleId = useId();
   const [prompt, setPrompt] = useState<InstallPrompt | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [hidden, setHidden] = useState(true);
-  const [ios, setIos] = useState(false);
-  const [mobile, setMobile] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const installed =
       window.matchMedia("(display-mode: standalone)").matches ||
       ("standalone" in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
     if (!import.meta.env.PROD || installed || !("serviceWorker" in navigator)) return;
-    const agent = navigator.userAgent;
-    setHidden(false);
-    setIos(/iphone|ipad|ipod/i.test(agent));
-    setMobile(/iphone|ipad|ipod|android/i.test(agent));
 
-    let cancel = false;
     function onPrompt(event: Event) {
       event.preventDefault();
       setPrompt(event as InstallPrompt);
     }
     window.addEventListener("beforeinstallprompt", onPrompt);
-    void navigator.serviceWorker.ready.then(() => {
-      if (!cancel) setSaved(true);
-    });
-    return () => {
-      cancel = true;
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-    };
+    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);
 
-  useEffect(() => {
-    if (!guideOpen) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setGuideOpen(false);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [guideOpen]);
-
-  if (hidden) return null;
+  if (!prompt) return null;
 
   async function install() {
-    if (!prompt) return;
     await prompt.prompt();
     setPrompt(null);
   }
 
-  const steps = ios
-    ? ["Tap the Share button in Safari.", "Tap Add to Home Screen.", "Tap Add."]
-    : ["Open the browser menu.", "Tap Install app or Add to Home screen.", "Confirm to add oec.fyi."];
-
   return (
-    <>
-      <p className="offline-note">
-        <span>{saved ? "Questions are saved on this device." : "Saving the questions on this device."}</span>
-        {prompt ? (
-          <button type="button" className="offline-install" onClick={() => void install()}>
-            Install
-          </button>
-        ) : mobile ? (
-          <button type="button" className="offline-install" onClick={() => setGuideOpen(true)}>
-            Add to Home Screen to open it like an app.
-          </button>
-        ) : null}
-      </p>
-      {guideOpen ? (
-        <div className="account-layer">
-          <button className="account-backdrop" type="button" aria-label="Close install steps" onClick={() => setGuideOpen(false)} />
-          <div className="account-dialog install-dialog" role="dialog" aria-modal="true" aria-labelledby={installTitleId}>
-            <button className="account-close" type="button" aria-label="Close" onClick={() => setGuideOpen(false)}>
-              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-                <path d="M4 4l8 8M12 4 4 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
-              </svg>
-            </button>
-            <h2 id={installTitleId}>Add to Home Screen</h2>
-            <ol>
-              {steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      ) : null}
-    </>
+    <p className="offline-note">
+      <button type="button" className="offline-install" onClick={() => void install()}>
+        Install
+      </button>
+    </p>
   );
 }
 
@@ -848,6 +790,22 @@ function ChapterMeter({ percent }: { percent: number }) {
   );
 }
 
+function BoardCrown({ className = "board-crown" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 37 32" aria-hidden="true">
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M18.5 0 27.5 8.5 30.5 8.5 33.5 6.5 35.5 6.5 36.5 7.5 34.5 16.5 32.5 23.5 4.5 23.5 2.5 15.5 0.5 7.5 1.5 6.5 3.5 6.5 6.5 8.5 9.5 8.5ZM18.5 8.5 23.5 13.5 19.5 18.5 13.5 13.5Z"
+      />
+      <path
+        fill="currentColor"
+        d="M6.6 27.2h23.8q1.2 0 1.2 1.2v1.4q0 1.8-2.2 1.8H7.4q-2 0-2-1.8v-1.4q0-1.2 1.2-1.2Z"
+      />
+    </svg>
+  );
+}
+
 function HomeBoard({ signedIn }: { signedIn: boolean }) {
   const [rows, setRows] = useState<BoardRow[] | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -869,14 +827,6 @@ function HomeBoard({ signedIn }: { signedIn: boolean }) {
     const list = listRef.current;
     if (!list) return;
     const measure = () => {
-      for (const name of list.querySelectorAll(".board-name.has-crown")) {
-        const person = name.querySelector(".board-person");
-        const crown = name.querySelector(".board-crown");
-        if (person instanceof HTMLElement && crown instanceof SVGElement) {
-          const height = person.offsetHeight;
-          if (height > 0) crown.style.height = `${height}px`;
-        }
-      }
       const items = [...list.querySelectorAll("li")].slice(0, 10);
       if (items.length === 0) return;
       const row = Math.max(...items.map((item) => item.getBoundingClientRect().height));
@@ -904,35 +854,33 @@ function HomeBoard({ signedIn }: { signedIn: boolean }) {
         <p className="board-status">The board is open. A finished practice test can claim the first place.</p>
       ) : (
         <>
-          <ol className="board-list" ref={listRef} tabIndex={rows.length > 10 ? 0 : undefined}>
-            {rows.map((row) => {
-              const takenLabel = row.takenAt ? formatBoardDate(row.takenAt) : null;
-              return (
-              <li key={`${row.rank}-${row.displayName}`} className={row.isSelf ? "is-self" : undefined}>
-                <span className="board-rank">{row.rank}</span>
-                <span className={row.rank === 1 ? "board-name has-crown" : "board-name"}>
-                  {row.rank === 1 ? (
-                    <svg className="board-crown" viewBox="2 3.2 28 19.4" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        fillRule="evenodd"
-                        d="M2 22.6 6.2 8.6 10.6 13.2 16 3.2 21.4 13.2l4.4-4.6L30 22.6H2Zm14-12.2 4.2 4.2L16 18.8l-4.2-4.2L16 10.4Z"
-                      />
-                    </svg>
-                  ) : null}
+          <div className="board-table">
+            <div className="board-columns">
+              <span>Rank</span>
+              <span>Name</span>
+              <span>Score</span>
+            </div>
+            <ol className="board-list" ref={listRef} tabIndex={rows.length > 10 ? 0 : undefined}>
+              {rows.map((row) => {
+                const takenLabel = row.takenAt ? formatBoardDate(row.takenAt) : null;
+                return (
+                <li key={`${row.rank}-${row.displayName}`} className={row.isSelf ? "is-self" : undefined}>
+                  <span className="board-rank" aria-label={row.rank === 1 ? "1" : undefined}>
+                    {row.rank === 1 ? <BoardCrown /> : row.rank}
+                  </span>
                   <span className="board-person">
                     <span className="board-person-name">{row.displayName}</span>
                     {takenLabel ? <span className="board-person-date">{takenLabel}</span> : null}
                   </span>
-                </span>
-                <span className="board-score">
-                  <strong>{row.percent}%</strong>
-                  <span>{row.length} questions</span>
-                </span>
-              </li>
-              );
-            })}
-          </ol>
+                  <span className="board-score">
+                    <strong>{row.percent}%</strong>
+                    <span>{row.length} questions</span>
+                  </span>
+                </li>
+                );
+              })}
+            </ol>
+          </div>
           {signedIn && !listed ? <p className="board-status">Save a display name to add your best test.</p> : null}
         </>
       )}
@@ -961,6 +909,11 @@ function Home({
 }) {
   const missed = missedIds(stats);
   const modesRef = useRef<HTMLDivElement>(null);
+  const [chaptersOpen, setChaptersOpen] = useState(false);
+  const chapterPreview = 5;
+  const canFoldChapters = chapters.length > chapterPreview;
+  const visibleChapters =
+    chaptersOpen || !canFoldChapters ? chapters : chapters.slice(0, chapterPreview);
   useModeGlow(modesRef);
 
   return (
@@ -1026,14 +979,13 @@ function Home({
           <span>Mixed questions. Answers stay hidden until the end.</span>
         </button>
       </div>
-      <HomeBoard signedIn={signedIn} />
       <section className="progress-panel" aria-label="Chapters">
         <div className="section-head">
           <h2>Chapters</h2>
           <p>Answered out of the total. Open a chapter to study its questions.</p>
         </div>
-        <div className="chapter-list">
-          {chapters.map((chapter) => {
+        <div className={canFoldChapters && !chaptersOpen ? "chapter-list is-preview" : "chapter-list"}>
+          {visibleChapters.map((chapter) => {
             const pool = questionsIn(chapter.id);
             const known = pool.filter((question) => stats.results[question.id]?.last === true).length;
             const seen = pool.filter((question) => (stats.results[question.id]?.seen ?? 0) > 0).length;
@@ -1042,7 +994,12 @@ function Home({
             const number = splitAt === -1 ? chapter.title : chapter.title.slice(0, splitAt + 1);
             const name = splitAt === -1 ? chapter.title : chapter.title.slice(splitAt + 2);
             return (
-              <button key={chapter.id} type="button" className="chapter-row" onClick={() => onReadChapter(chapter.id)}>
+              <button
+                key={chapter.id}
+                type="button"
+                className="chapter-row"
+                onClick={() => onReadChapter(chapter.id)}
+              >
                 <span className="chapter-row-name">
                   <span className="chapter-row-num">{number}</span>
                   <span className="chapter-row-label">{name}</span>
@@ -1055,7 +1012,19 @@ function Home({
             );
           })}
         </div>
+        {canFoldChapters ? (
+          <button
+            type="button"
+            className="chapter-more"
+            aria-expanded={chaptersOpen}
+            aria-label={chaptersOpen ? "Show fewer chapters" : "Show all chapters"}
+            onClick={() => setChaptersOpen((open) => !open)}
+          >
+            <span className="chapter-more-chevron" aria-hidden="true" />
+          </button>
+        ) : null}
       </section>
+      <HomeBoard signedIn={signedIn} />
     </div>
   );
 }

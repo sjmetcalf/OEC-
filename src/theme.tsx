@@ -1,25 +1,30 @@
 import { useEffect, useState } from "react";
 
-export type ThemeChoice = "system" | "light" | "dark";
+export type ThemeChoice = "light" | "dark";
 
 export const themeKey = "oec-theme";
+
+function themeFromSystem(): ThemeChoice {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 export function readThemeChoice(): ThemeChoice {
   try {
     const value = localStorage.getItem(themeKey);
-    if (value === "light" || value === "dark" || value === "system") return value;
+    if (value === "light" || value === "dark") return value;
+    const resolved = themeFromSystem();
+    localStorage.setItem(themeKey, resolved);
+    return resolved;
   } catch {
-    // Private mode can block storage. Follow the system until a choice is saved.
+    // Private mode can block storage. Use the current system look for this visit only.
+    return themeFromSystem();
   }
-  return "system";
 }
 
 export function applyTheme(choice: ThemeChoice) {
-  const resolved =
-    choice === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : choice;
-  document.documentElement.setAttribute("data-theme", resolved);
-  document.documentElement.style.colorScheme = resolved;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#16121f" : "#a855f7");
+  document.documentElement.setAttribute("data-theme", choice);
+  document.documentElement.style.colorScheme = choice;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", choice === "dark" ? "#16121f" : "#a855f7");
 }
 
 export function ThemeControl() {
@@ -27,11 +32,6 @@ export function ThemeControl() {
 
   useEffect(() => {
     applyTheme(choice);
-    if (choice !== "system") return;
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => applyTheme("system");
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
   }, [choice]);
 
   function choose(next: ThemeChoice) {
@@ -45,7 +45,6 @@ export function ThemeControl() {
   }
 
   const options = [
-    ["system", "System"],
     ["light", "Light"],
     ["dark", "Dark"],
   ] as const;

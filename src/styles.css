@@ -485,26 +485,6 @@ h3 {
   color: var(--accent-hover);
 }
 
-.install-dialog {
-  justify-items: stretch;
-  padding-top: 1.35rem;
-  text-align: left;
-}
-
-.install-dialog h2 {
-  margin: 0;
-  font-size: 1.15rem;
-  letter-spacing: -0.03em;
-}
-
-.install-dialog ol {
-  display: grid;
-  gap: 0.45rem;
-  margin: 0;
-  padding-left: 1.15rem;
-  line-height: 1.45;
-}
-
 .account-page {
   display: grid;
   gap: 1.35rem;
@@ -937,26 +917,49 @@ h3 {
   transform: rotate(225deg);
 }
 
+.board-columns,
+.board-list li {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.board-columns {
+  padding: 0 1rem;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.board-columns span:first-child {
+  text-align: center;
+}
+
+.board-columns span:last-child {
+  text-align: right;
+}
+
+.board-table {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .board-list {
   display: grid;
-  gap: 0.4rem;
+  gap: 0.15rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .board-list li {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr) auto;
-  gap: 0.75rem;
-  align-items: center;
-  min-height: 2.75rem;
-  padding: 0.45rem 0.7rem;
-  border-radius: 12px;
-}
-
-.board-list li.is-self {
-  background: var(--accent-soft);
+  min-height: 3.05rem;
+  padding: 0.4rem 1rem;
+  border-radius: 10px;
+  background: var(--card-glass-soft);
 }
 
 .board-rank,
@@ -966,20 +969,17 @@ h3 {
 }
 
 .board-rank {
+  display: grid;
+  place-items: center;
   color: var(--ink-muted);
-}
-
-.board-name {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
+  line-height: 1;
 }
 
 .board-person {
   display: grid;
-  gap: 0.05rem;
+  gap: 0.08rem;
   min-width: 0;
+  align-content: start;
 }
 
 .board-person-name {
@@ -987,22 +987,21 @@ h3 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.2;
+  line-height: 1.05;
 }
 
 .board-person-date {
   color: var(--ink-muted);
   font-size: 0.75rem;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.1;
 }
 
 .board-crown {
-  flex: 0 0 auto;
-  width: auto;
-  height: 2.15rem;
-  aspect-ratio: 28 / 19.4;
-  color: #f5b400;
+  display: block;
+  width: 2.15rem;
+  height: auto;
+  color: #e5ac16;
 }
 
 .board-score {
@@ -2233,16 +2232,17 @@ button.choice {
 .home-board {
   display: grid;
   gap: 0.85rem;
-  padding: 1.15rem 1.2rem 1.2rem;
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
-  background: var(--card);
-  box-shadow: var(--shadow-card);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
+
 .home-board .board-list {
-  --board-row: 2.75rem;
-  --board-gap: 0.4rem;
+  --board-row: 3.05rem;
+  --board-gap: 0.15rem;
   max-height: calc(10 * var(--board-row) + 9 * var(--board-gap));
   overflow-x: hidden;
   overflow-y: auto;
@@ -2259,9 +2259,11 @@ button.choice {
 
 .home-board .section-head h2 {
   margin: 0;
+  color: var(--ink);
   font-size: 1.5rem;
   font-weight: 500;
   letter-spacing: -0.035em;
+  line-height: 1.25;
 }
 
 .progress-panel .section-head {
@@ -2280,6 +2282,49 @@ button.choice {
 .chapter-list {
   column-count: 2;
   column-gap: 1.75rem;
+}
+
+.chapter-list.is-preview {
+  column-count: 1;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 52%, transparent 100%);
+}
+
+.chapter-more {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  padding: 0.35rem 0 0.2rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  opacity: 0.72;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chapter-more:hover,
+.chapter-more:focus-visible {
+  opacity: 1;
+}
+
+.chapter-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chapter-more-chevron {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-right: 2.25px solid currentColor;
+  border-bottom: 2.25px solid currentColor;
+  transform: translateY(-0.14rem) rotate(45deg);
+}
+
+.chapter-more[aria-expanded="true"] .chapter-more-chevron {
+  transform: translateY(0.12rem) rotate(225deg);
 }
 
 .chapter-row {
@@ -2639,9 +2684,12 @@ button.choice {
   }
 
   .shuffle-switch-track,
-  .shuffle-switch-thumb {
+  .shuffle-switch-thumb,
+  .chapter-more,
+  .chapter-more-chevron {
     transition:
-      transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 0.15s ease,
       background 0.15s ease;
   }
 
