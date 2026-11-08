@@ -651,9 +651,10 @@ function OfflineInstall() {
   }, []);
 
   if (!prompt) return null;
+  const ready = prompt;
 
   async function install() {
-    await prompt.prompt();
+    await ready.prompt();
     setPrompt(null);
   }
 
