@@ -44,7 +44,6 @@
   --backdrop: rgba(61, 42, 92, 0.28);
   --user-hover: #ececed;
   --user-ring: #ffffff;
-  --theme-active: #ffffff;
   --radius: 10px;
   --radius-lg: 12px;
   --max: 1080px;
@@ -62,7 +61,7 @@
   line-height: 1.55;
   color: var(--ink);
   background: var(--page);
-  color-scheme: light;
+  color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -2666,7 +2665,6 @@ button.choice {
 @media (prefers-reduced-motion: no-preference) {
   .brand,
   .user-button,
-  .theme-control button,
   .quiz-back,
   .text-button,
   .offline-install,
@@ -2764,52 +2762,6 @@ button.choice {
   }
 }
 
-.theme-control {
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
-  min-width: 0;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface);
-}
-
-.theme-control button {
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  padding: 0.22rem 0.5rem;
-  color: var(--ink-muted);
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.theme-control button[aria-pressed="true"] {
-  background: var(--theme-active);
-  color: var(--ink);
-}
-
-.theme-control button:focus {
-  outline: none;
-}
-
-.theme-control button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-@media (max-width: 800px) {
-  .theme-control button {
-    padding: 0.18rem 0.38rem;
-    font-size: 0.6875rem;
-  }
-}
-
 :root[data-theme="dark"] {
   color-scheme: dark;
   --ink: #f4efe8;
@@ -2854,7 +2806,6 @@ button.choice {
   --backdrop: rgba(6, 4, 12, 0.72);
   --user-hover: #3d3450;
   --user-ring: #342c44;
-  --theme-active: #463d5c;
 }
 
 :root[data-theme="dark"] ::selection {

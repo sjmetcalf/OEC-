@@ -1,7 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import Account from "./Account.tsx";
 import AccountPage from "./AccountPage.tsx";
-import { ThemeControl } from "./theme.tsx";
 import { BackButton } from "./BackButton.tsx";
 import { BlurText, CountUp } from "./bits.tsx";
 import { Threads } from "./threads.tsx";
@@ -467,7 +466,6 @@ export default function App() {
             </button>
           </div>
           <div className="topbar-actions">
-            <ThemeControl />
             {supabase && (
               <Account
                 email={userEmail}

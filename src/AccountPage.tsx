@@ -342,7 +342,6 @@ export default function AccountPage({
       </header>
       <MagicBento
         className="account-bento"
-        theme="light"
         columns={2}
         minCell={112}
         gap={14}

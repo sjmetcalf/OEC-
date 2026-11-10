@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#a855f7" />
+    <meta name="theme-color" content="#16121f" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="oec.fyi" />
@@ -16,17 +16,14 @@
     <link rel="icon" href="/favicon.svg" />
     <script>
       (function () {
-        var choice = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         try {
-          var stored = localStorage.getItem("oec-theme");
-          if (stored === "light" || stored === "dark") choice = stored;
-          else localStorage.setItem("oec-theme", choice);
+          if (localStorage.getItem("oec-theme") !== "dark") localStorage.setItem("oec-theme", "dark");
         } catch (e) {}
         var root = document.documentElement;
-        root.setAttribute("data-theme", choice);
-        root.style.colorScheme = choice;
+        root.setAttribute("data-theme", "dark");
+        root.style.colorScheme = "dark";
         var meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute("content", choice === "dark" ? "#16121f" : "#a855f7");
+        if (meta) meta.setAttribute("content", "#16121f");
       })();
     </script>
   </head>
