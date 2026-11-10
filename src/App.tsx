@@ -1348,9 +1348,12 @@ function ReadPool({
       <div className="qlist">
         {pool.map((question, index) => (
           <article key={question.id} className="qcard">
-            <p className="qid">
-              {index + 1} / {pool.length}
-            </p>
+            <div className="qcard-meta">
+              <p className="qid">
+                {index + 1} / {pool.length}
+              </p>
+              <AttemptScore attempt={stats.results[question.id]} />
+            </div>
             <h2>{question.prompt}</h2>
             <ol className="choices">
               {answerOrder(question.id, undefined, shuffleAnswers, shuffleSeed).map((choiceIndex, displayIndex) => {
@@ -1529,19 +1532,20 @@ function Quiz({
           })}
         </div>
         {session.revealed && current.explanation ? <p className="explain">{current.explanation}</p> : null}
-        <div className={drilling ? "quiz-foot drill-foot" : "quiz-foot"}>
-          {drilling ? (
-            <AttemptScore attempt={stats.results[current.id]} />
-          ) : (
+        <div className="quiz-foot">
+          {drilling ? null : (
             <p className="quiz-hint">
               {session.mode === "exam"
                 ? "Answers stay hidden until the end. Press 1–4, then Enter."
                 : "Press 1–4 to answer. Enter for the next question."}
             </p>
           )}
-          <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
+          <div className="quiz-foot-actions">
+            <AttemptScore attempt={stats.results[current.id]} />
+            <button type="button" className="primary" disabled={pick === undefined} onClick={onNext}>
             {drilling || session.index !== session.items.length - 1 ? "Next" : "See results"}
-          </button>
+            </button>
+          </div>
         </div>
       </article>
     </section>

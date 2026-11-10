@@ -1381,8 +1381,23 @@ button:focus-visible {
   color: var(--ok);
 }
 
-.quiz-foot .primary {
+.quiz-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin-left: auto;
+}
+
+.qcard-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.35rem;
+}
+
+.qcard-meta .qid {
+  margin: 0;
 }
 
 .quiz h1 {
@@ -2581,6 +2596,10 @@ button.choice {
     align-items: stretch;
   }
 
+  .quiz-foot-actions {
+    width: 100%;
+  }
+
   .exam-chapters {
     grid-template-columns: 1fr;
   }
@@ -2621,7 +2640,7 @@ button.choice {
     display: none;
   }
 
-  .quiz-foot.drill-foot {
+  .quiz-foot-actions {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
